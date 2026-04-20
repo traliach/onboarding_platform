@@ -54,7 +54,7 @@ export function createJobsRouter(
               log_message, error_message, started_at, completed_at
          FROM job_steps
          WHERE job_id = $1
-         ORDER BY started_at NULLS LAST, id`,
+         ORDER BY step_order`,
       [id],
     );
 

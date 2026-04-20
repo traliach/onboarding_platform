@@ -62,7 +62,7 @@ export function createPortalRouter(
            FROM job_steps js
            JOIN jobs j ON j.id = js.job_id
            WHERE j.client_id = $1
-           ORDER BY js.started_at NULLS LAST, js.id`,
+           ORDER BY js.step_order`,
         [clientRow.id],
       ),
       db.query<PortalTaskRow>(

@@ -191,7 +191,7 @@ export function createClientsRouter(
              FROM job_steps js
              JOIN jobs j ON j.id = js.job_id
              WHERE j.client_id = $1
-             ORDER BY js.started_at NULLS LAST, js.id`,
+             ORDER BY js.step_order`,
           [id],
         ),
         db.query<HumanTaskRow>(
@@ -256,12 +256,13 @@ export function createClientsRouter(
 
       // One INSERT per step rather than VALUES ($1,$2),($3,$4)... — the row
       // count is tiny (3-7) and keeping each insert parameter-bound beats
-      // building a dynamic VALUES list.
-      for (const step of steps) {
+      // building a dynamic VALUES list. step_order is the registry index
+      // and drives ORDER BY on every read path (see migration 0008).
+      for (const [i, step] of steps.entries()) {
         await tx.query(
-          `INSERT INTO job_steps (job_id, step_name, plain_label, status)
-                VALUES ($1, $2, $3, 'pending')`,
-          [jobId, step.step_name, step.plain_label],
+          `INSERT INTO job_steps (job_id, step_name, plain_label, status, step_order)
+                VALUES ($1, $2, $3, 'pending', $4)`,
+          [jobId, step.step_name, step.plain_label, i],
         );
       }
 
