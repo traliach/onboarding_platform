@@ -78,7 +78,17 @@ export function createDb(config: AppConfig, logger: Logger): Db {
     },
 
     async ping(): Promise<void> {
-      await pool.query('SELECT 1');
+      try {
+        await pool.query('SELECT 1');
+      } catch {
+        // pg caches idle TCP sessions inside the pool. When PostgreSQL
+        // restarts, the first query on a cached-but-dead socket throws
+        // "Connection terminated unexpectedly" before the connection is
+        // evicted. Retry once so the ping reflects actual DB reachability
+        // rather than pool cache freshness. If the retry also fails, the
+        // underlying error bubbles and the readiness endpoint returns 503.
+        await pool.query('SELECT 1');
+      }
     },
 
     async close(): Promise<void> {

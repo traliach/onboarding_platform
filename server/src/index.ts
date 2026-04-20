@@ -47,6 +47,22 @@ function formatDetail(detail: unknown): string {
   }
 }
 
+/**
+ * Stringify an unknown thrown value for structured logs. Some pg errors
+ * arrive with an empty `.message` (connect-time failures mid-shutdown), so
+ * fall back to the error name before giving up. Never returns an empty
+ * string — log entries always carry a signal of what went wrong.
+ */
+function describeError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message || err.name || 'unknown error';
+  }
+  if (typeof err === 'string') {
+    return err;
+  }
+  return formatDetail(err);
+}
+
 function failBeforeLogger(message: string, detail?: unknown): never {
   process.stderr.write(`FATAL: ${message}\n`);
   if (detail !== undefined) {
@@ -76,7 +92,7 @@ function installCrashHandlers(logger: Logger, db: Db): void {
 
   process.on('unhandledRejection', (reason: unknown) => {
     panicShutdown('unhandled rejection', {
-      reason: reason instanceof Error ? reason.message : String(reason),
+      reason: describeError(reason),
     });
   });
 }
@@ -119,9 +135,7 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
       await db.ping();
       res.status(200).json({ status: 'ready', target: config.appTarget });
     } catch (err: unknown) {
-      logger.warn('readiness check failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.warn('readiness check failed', { error: describeError(err) });
       res.status(503).json({ status: 'not_ready', target: config.appTarget });
     }
   });
@@ -139,18 +153,14 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
     try {
       await closeServer(server);
     } catch (err: unknown) {
-      logger.error('error during server close', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.error('error during server close', { error: describeError(err) });
     }
     try {
       await db.close();
       logger.info('api stopped cleanly');
       process.exit(0);
     } catch (err: unknown) {
-      logger.error('error closing db pool', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.error('error closing db pool', { error: describeError(err) });
       process.exit(1);
     }
   };
@@ -183,9 +193,7 @@ function startWorker(config: AppConfig, db: Db, logger: Logger): void {
       logger.info('worker stopped cleanly');
       process.exit(0);
     } catch (err: unknown) {
-      logger.error('error closing db pool', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+      logger.error('error closing db pool', { error: describeError(err) });
       process.exit(1);
     }
   };
@@ -219,9 +227,7 @@ async function main(): Promise<void> {
     await db.ping();
     logger.info('db reachable');
   } catch (err: unknown) {
-    logger.error('db unreachable at startup', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logger.error('db unreachable at startup', { error: describeError(err) });
     await db.close();
     process.exit(1);
   }
