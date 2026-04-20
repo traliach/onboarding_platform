@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=../.env src/index.ts",
     "dev:worker": "cross-env APP_TARGET=worker tsx watch --env-file=../.env src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node --input-type=module -e \"import{cpSync} from 'node:fs';cpSync('src/db/migrations','dist/server/src/db/migrations',{recursive:true,force:true});\"",
     "start": "node dist/server/src/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
