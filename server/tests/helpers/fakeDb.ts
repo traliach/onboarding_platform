@@ -46,7 +46,7 @@ function emptyResult<R extends QueryResultRow>(rows: R[]): QueryResult<R> {
  */
 export function createFakeDb(users: FakeUserRow[]): Db {
   return {
-    async query<R extends QueryResultRow = QueryResultRow>(
+    query<R extends QueryResultRow = QueryResultRow>(
       text: string,
       params?: readonly unknown[],
     ): Promise<QueryResult<R>> {
@@ -55,28 +55,30 @@ export function createFakeDb(users: FakeUserRow[]): Db {
       if (/FROM users\s+WHERE email = \$1/i.test(normalised)) {
         const email = params?.[0] as string | undefined;
         const hit = users.find((u) => u.email === email);
-        return emptyResult((hit ? [hit] : []) as unknown as R[]);
+        return Promise.resolve(emptyResult((hit ? [hit] : []) as unknown as R[]));
       }
 
       if (/FROM users\s+WHERE id = \$1/i.test(normalised)) {
         const id = params?.[0] as string | undefined;
         const hit = users.find((u) => u.id === id);
-        return emptyResult((hit ? [hit] : []) as unknown as R[]);
+        return Promise.resolve(emptyResult((hit ? [hit] : []) as unknown as R[]));
       }
 
-      throw new Error(`fakeDb: unhandled query: ${normalised}`);
+      return Promise.reject(new Error(`fakeDb: unhandled query: ${normalised}`));
     },
 
-    async withTransaction() {
-      throw new Error('fakeDb: withTransaction is not supported in unit tests');
+    withTransaction() {
+      return Promise.reject(
+        new Error('fakeDb: withTransaction is not supported in unit tests'),
+      );
     },
 
-    async ping() {
-      /* no-op */
+    ping() {
+      return Promise.resolve();
     },
 
-    async close() {
-      /* no-op */
+    close() {
+      return Promise.resolve();
     },
   };
 }

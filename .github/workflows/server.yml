@@ -1,0 +1,138 @@
+# Backend CI (CLAUDE.md §11).
+#
+# What this does:
+#   - On every pull request and every push to main that touches server/
+#     (or this file), install dependencies, lint, typecheck, run the
+#     Jest suite, and build the TypeScript output.
+#   - Builds the production Docker image in a separate job so a
+#     broken Dockerfile (ADR-002 deploy artifact) fails CI instead of
+#     surfacing at `docker compose up` time on a teammate's laptop or
+#     at deploy time on EC2.
+#   - Path filter keeps this workflow silent for frontend-only, infra,
+#     docs, and monitoring changes. The separate client.yml and
+#     (future) infra.yml workflows own those paths.
+#
+# What this does NOT do:
+#   - No coverage gate. `test:coverage` exists locally; once we have a
+#     meaningful threshold in mind, a single line (`npm run
+#     test:coverage -- --coverageThreshold=...`) replaces `npm test`.
+#     Picking a threshold before we have the full suite is premature.
+#   - No integration tests against real Postgres/Redis. The Jest suite
+#     uses a fake Db (tests/helpers/fakeDb.ts) on purpose — it keeps
+#     CI <10s and reproducible. When contract-level tests land, they
+#     go in a second job that spins up services via `services:` blocks.
+#   - No image push. CI proves the image builds; publishing to a
+#     registry is the deploy pipeline's responsibility and will live
+#     in the infra workflow once that exists.
+
+name: server
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+
+# Cancel in-flight runs when a new commit lands on the same PR/branch.
+# Same rationale as client.yml: save CI minutes on rapid-fire pushes.
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege: this workflow only reads the repo. No PR comments,
+# no pushes, no package writes.
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    # Single job on purpose: lint/typecheck/test/build share the
+    # `node_modules/` from the same `npm ci`. Splitting them would
+    # triple the install cost for no clearer signal — each step
+    # already prints its own header in the log.
+    name: lint + typecheck + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          # Matches server/package.json `engines.node` and the Alpine
+          # base image in server/Dockerfile (node:22-alpine). Bumping
+          # here means bumping both in lockstep.
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci` fails if the lockfile drifts from package.json —
+        # exactly the signal we want in CI.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        # Jest writes to stdout only; no coverage artifact to upload
+        # yet. If/when we enable coverage gates the `--ci` flag here
+        # will start emitting JUnit output for PR annotations.
+        run: npm test -- --ci
+
+      - name: Build
+        # Compiles TS → dist/ and copies migration SQL files. A green
+        # build here is the minimum bar for "this commit could be
+        # deployed" — the docker job below is the stricter check.
+        run: npm run build
+
+  docker:
+    # Separate job so a `node_modules/`-level failure doesn't hide a
+    # Dockerfile regression (and vice versa). We only build the image;
+    # publishing it is a deploy-pipeline concern.
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No `needs: ci` — the two jobs exercise different failure modes
+    # and can race. A red `ci` job without a red `docker` job is still
+    # a red PR check, which is all we need.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Buildx gives us the GitHub Actions cache backend below.
+        # Without it, every CI run re-downloads every base-image layer.
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          # Intentionally no `push: true` and no registry login. A
+          # local build proves the Dockerfile compiles on the CI
+          # runner's architecture; that's the whole signal we need
+          # for a PR check.
+          push: false
+          load: true
+          tags: onboarding-server:ci
+          # GHA cache is free for public repos and tiny for private
+          # ones at this image size. Without it a cold build runs
+          # `npm ci` twice (build stage + runtime stage) on every PR.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -60,7 +60,8 @@ describe('POST /auth/login', () => {
       .send({ email: SEED_EMAIL, password: SEED_PASSWORD });
 
     expect(res.status).toBe(200);
-    expect(res.body.user).toMatchObject({
+    const loginBody = res.body as { user: { id: string; email: string } };
+    expect(loginBody.user).toMatchObject({
       id: '00000000-0000-0000-0000-000000000001',
       email: SEED_EMAIL,
     });
@@ -140,7 +141,8 @@ describe('GET /auth/me', () => {
 
     const me = await request(app).get('/auth/me').set('Cookie', sessionCookie);
     expect(me.status).toBe(200);
-    expect(me.body.user.email).toBe(SEED_EMAIL);
+    const meBody = me.body as { user: { email: string } };
+    expect(meBody.user.email).toBe(SEED_EMAIL);
   });
 });
 
