@@ -24,7 +24,7 @@
 # service in compose).
 
 # ---------- builder ----------
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /build
 
@@ -47,7 +47,7 @@ COPY server/src ./server/src
 RUN cd server && npm run build && npm prune --omit=dev
 
 # ---------- runtime ----------
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 
 # Tini forwards SIGTERM cleanly to node so graceful shutdown in
 # src/index.ts actually runs. Without it, PID 1 is node and signal
