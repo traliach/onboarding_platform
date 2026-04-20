@@ -2,14 +2,31 @@
   "name": "onboarding-platform-client",
   "version": "0.1.0",
   "private": true,
-  "description": "Internal dashboard and client portal for onboarding_platform. React + Vite + Tailwind lands in Phase 1.6; this package currently exposes the shared domain types consumed by server/.",
+  "description": "Internal dashboard (JWT-auth) and public client portal (UUID token URL) for onboarding_platform. React 19 + Vite + Tailwind CSS; imports shared domain types from src/types/, which is also consumed directly by server/.",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "@types/node": "^22.19.17",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^6.0.3",
+    "vite": "^7.0.0"
   }
 }
