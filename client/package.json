@@ -1,0 +1,15 @@
+{
+  "name": "onboarding-platform-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal dashboard and client portal for onboarding_platform. React + Vite + Tailwind lands in Phase 1.6; this package currently exposes the shared domain types consumed by server/.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
