@@ -19,8 +19,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "migrate": "tsx src/db/migrate.ts",
-    "seed": "tsx src/db/seed.ts"
+    "migrate": "tsx --env-file=../.env src/db/migrate.ts",
+    "seed": "tsx --env-file=../.env src/db/seed.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
