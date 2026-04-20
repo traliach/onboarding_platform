@@ -75,8 +75,16 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     });
   } catch (err) {
     // fetch throws only on network-layer failure (DNS, connection refused,
-    // CORS pre-flight rejection). HTTP errors are successful fetches with
-    // a non-2xx status — handled below.
+    // CORS pre-flight rejection, or an aborted signal). HTTP errors are
+    // successful fetches with a non-2xx status — handled below.
+    //
+    // Re-throw AbortError unchanged so callers can detect it with the
+    // idiomatic `err instanceof DOMException && err.name === 'AbortError'`
+    // check. Wrapping it in NetworkError would make every unmount in
+    // React StrictMode look like a real network failure.
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw err;
+    }
     throw new NetworkError(err);
   }
 
