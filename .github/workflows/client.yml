@@ -1,0 +1,92 @@
+# Frontend CI (CLAUDE.md §11).
+#
+# What this does:
+#   - On every pull request and every push to main that touches client/
+#     (or this file), install dependencies with `npm ci`, typecheck, and
+#     build. A green run is the signal that the Vercel deployment
+#     (ADR-006) will succeed.
+#   - Path filter keeps this workflow silent for backend-only, infra,
+#     docs, and monitoring changes. The separate server.yml and
+#     infra.yml workflows own those paths.
+#
+# What this does NOT do:
+#   - No ESLint step. There is no eslint config in client/ today; the
+#     `lint` script was dropped along with this workflow to avoid a
+#     "configured but broken" state. TypeScript strict mode plus the
+#     `vite build` step catches every compile-time error we care about
+#     for now. If formatting/style enforcement is added later, it
+#     becomes a focused commit that adds the tooling AND the workflow
+#     step in one atomic change.
+#   - No unit tests. The frontend has no test suite yet. When one lands
+#     (likely Vitest, since we already use Vite) a `test` step goes
+#     between typecheck and build.
+#   - No Vercel deploy step. Deployment is handled by Vercel's GitHub
+#     integration — it watches the same commits, builds independently,
+#     and posts preview URLs on PRs. Duplicating that here would be
+#     redundant and would also require a VERCEL_TOKEN secret.
+
+name: client
+
+on:
+  pull_request:
+    paths:
+      - "client/**"
+      - ".github/workflows/client.yml"
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client.yml"
+
+# Cancel in-flight runs when a new commit lands on the same PR/branch.
+# Saves CI minutes on rapid-fire pushes without affecting main-branch
+# runs (which share concurrency by ref, not across refs).
+concurrency:
+  group: client-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default to least-privilege. This workflow only reads the repo; it
+# never comments on PRs, never pushes, and never touches packages.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: typecheck + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          # Matches client/package.json `engines.node` and the Vercel
+          # runtime. Bumping here means bumping both places in lockstep.
+          node-version: "22"
+          # Cache key is the lockfile in client/. The default `npm`
+          # cache strategy hashes package-lock.json for us.
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci` is strict: fails if package-lock.json is out of sync
+        # with package.json. That is the exact behaviour we want in CI
+        # — a forgotten lockfile update should break the build, not
+        # silently resolve to a different dependency graph.
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        # `build` itself runs `tsc --noEmit && vite build`, so a build
+        # failure almost always surfaces as a typecheck failure first.
+        # We keep both steps so the CI log makes the stage of failure
+        # obvious at a glance without scrolling through vite output.
+        run: npm run build
