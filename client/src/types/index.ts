@@ -121,6 +121,15 @@ export interface ClientDetail {
 }
 
 /**
+ * GET /jobs/:id — polled live by JobDetail.tsx for step progress updates.
+ * The client row is already in context from the parent ClientPage.
+ */
+export interface JobDetail {
+  job: Job;
+  steps: JobStep[];
+}
+
+/**
  * GET /analytics/summary — powers the Analytics tab.
  * success_rate and failure_rate are fractions in [0, 1].
  */

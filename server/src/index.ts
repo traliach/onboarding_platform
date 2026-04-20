@@ -28,7 +28,11 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Request, type Response, type NextFunction } from 'express';
 
+import { createAnalyticsRouter } from './api/analytics';
 import { createAuthRouter } from './api/auth';
+import { createClientsRouter } from './api/clients';
+import { createJobsRouter } from './api/jobs';
+import { createPortalRouter } from './api/portal';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
 import { createDb, type Db } from './db/pool';
 import { createRootLogger, type Logger } from './logger';
@@ -160,6 +164,10 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
   });
 
   app.use('/auth', createAuthRouter(config, db, logger));
+  app.use('/clients', createClientsRouter(config, db, logger));
+  app.use('/jobs', createJobsRouter(config, db, logger));
+  app.use('/portal', createPortalRouter(config, db, logger));
+  app.use('/analytics', createAnalyticsRouter(config, db, logger));
 
   const server = app.listen(config.port, () => {
     logger.info('api listening', {
