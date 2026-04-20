@@ -31,8 +31,8 @@ services:
 
   api:
     build:
-      context: ./app
-    image: onboarding-platform-app:local
+      context: ./server
+    image: onboarding-platform-server:local
     restart: unless-stopped
     environment:
       NODE_ENV: development
@@ -52,7 +52,7 @@ services:
     command: ["sh", "-c", "node src/db/migrate.js && node src/index.js"]
 
   worker:
-    image: onboarding-platform-app:local
+    image: onboarding-platform-server:local
     restart: unless-stopped
     environment:
       NODE_ENV: development
