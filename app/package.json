@@ -1,0 +1,37 @@
+{
+  "name": "onboarding-platform-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Onboarding platform API + BullMQ worker. Entry point is selected via APP_TARGET=api|worker.",
+  "license": "MIT",
+  "author": "Achille Traore <t.achille.tech@gmail.com>",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "APP_TARGET=api node --watch src/index.js",
+    "dev:worker": "APP_TARGET=worker node --watch src/index.js",
+    "build": "echo \"no build step — source runs directly on Node\" && exit 0",
+    "test": "jest --runInBand",
+    "test:unit": "jest --runInBand tests/unit",
+    "test:integration": "jest --runInBand tests/integration",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/db/migrations/**"
+    ]
+  }
+}
