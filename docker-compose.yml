@@ -1,0 +1,75 @@
+name: onboarding_platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onboarding
+      POSTGRES_USER: onboarding
+      POSTGRES_PASSWORD: onboarding
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onboarding -d onboarding"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./app
+    image: onboarding-platform-app:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      APP_TARGET: api
+      PORT: "3000"
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://onboarding:onboarding@postgres:5432/onboarding
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: client-provisioning
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    command: ["sh", "-c", "node src/db/migrate.js && node src/index.js"]
+
+  worker:
+    image: onboarding-platform-app:local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      APP_TARGET: worker
+      PORT: "3000"
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://onboarding:onboarding@postgres:5432/onboarding
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: client-provisioning
+    depends_on:
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["node", "src/index.js"]
+
+volumes:
+  postgres-data:
