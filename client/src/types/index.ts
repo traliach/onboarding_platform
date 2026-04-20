@@ -85,6 +85,22 @@ export interface User {
 }
 
 /**
+ * Request body for POST /auth/login.
+ */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/**
+ * Response body for POST /auth/login and GET /auth/me. The JWT is set via
+ * Set-Cookie on login — it is never included in the response body (§10).
+ */
+export interface AuthResponse {
+  user: User;
+}
+
+/**
  * GET /clients — list entries include progress counts computed server-side
  * so the dashboard can render "X / N steps" without a second round-trip.
  */

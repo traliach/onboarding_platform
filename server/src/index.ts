@@ -24,8 +24,11 @@
 
 import type { Server } from 'node:http';
 
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import express, { type Request, type Response, type NextFunction } from 'express';
 
+import { createAuthRouter } from './api/auth';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
 import { createDb, type Db } from './db/pool';
 import { createRootLogger, type Logger } from './logger';
@@ -113,6 +116,8 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
   const app = express();
   app.disable('x-powered-by');
 
+  // Request logger runs first so it sees every request, including CORS
+  // preflight OPTIONS that cors() answers directly.
   app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     res.on('finish', () => {
@@ -125,6 +130,20 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
     });
     next();
   });
+
+  // CORS: explicit origin list from config (no wildcard — validated at load
+  // time). credentials:true lets the browser send the session cookie on
+  // cross-origin requests from the Vite dev server / deployed Vercel host.
+  app.use(
+    cors({
+      origin: config.corsAllowedOrigins as string[],
+      credentials: true,
+    }),
+  );
+  app.use(cookieParser());
+  // 100kb is comfortably larger than any login/create-client body and small
+  // enough to reject absurd payloads before they hit the router.
+  app.use(express.json({ limit: '100kb' }));
 
   app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', target: config.appTarget });
@@ -139,6 +158,8 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
       res.status(503).json({ status: 'not_ready', target: config.appTarget });
     }
   });
+
+  app.use('/auth', createAuthRouter(config, db, logger));
 
   const server = app.listen(config.port, () => {
     logger.info('api listening', {
