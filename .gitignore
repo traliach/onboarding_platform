@@ -46,3 +46,12 @@ coverage/
 # AI session config (local-only governance files)
 CLAUDE.md
 .cursorrules
+
+# Personal / local-only documentation
+# Kept on disk but never pushed — these are the author's private
+# working notes, not project artifacts.
+prompt.MD
+docs/Onboarding platform build story.MD
+
+# Transient curl / dev artifacts
+cookies.txt
