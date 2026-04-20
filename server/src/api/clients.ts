@@ -42,6 +42,7 @@ import {
 } from '../db/mappers';
 import type { Logger } from '../logger';
 import { requireAuth } from '../middleware/auth';
+import type { JobQueue } from '../queue';
 import { stepsForTier } from '../workflow/registry';
 
 const VALID_TIERS: readonly Tier[] = ['basic', 'professional', 'enterprise'];
@@ -125,6 +126,7 @@ export function createClientsRouter(
   config: AppConfig,
   db: Db,
   logger: Logger,
+  queue: JobQueue,
 ): Router {
   const router = Router();
   router.use(requireAuth(config, db, logger));
@@ -231,55 +233,70 @@ export function createClientsRouter(
     const actor = req.user?.email ?? 'unknown';
     const steps = stepsForTier(parsed.tier);
 
-    const created = await db.withTransaction(async (tx) => {
-      const clientInsert = await tx.query<ClientRow>(
-        `INSERT INTO clients (name, company, email, phone, tier)
-              VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, name, company, email, phone, tier, status,
-                     portal_token, created_at, updated_at`,
-        [parsed.name, parsed.company, parsed.email, parsed.phone, parsed.tier],
-      );
-      const clientRow = clientInsert.rows[0];
-      if (clientRow === undefined) {
-        throw new Error('client insert returned no row');
-      }
-
-      const jobInsert = await tx.query<{ id: string }>(
-        `INSERT INTO jobs (client_id, status) VALUES ($1, 'pending')
-           RETURNING id`,
-        [clientRow.id],
-      );
-      const jobId = jobInsert.rows[0]?.id;
-      if (jobId === undefined) {
-        throw new Error('job insert returned no row');
-      }
-
-      // One INSERT per step rather than VALUES ($1,$2),($3,$4)... — the row
-      // count is tiny (3-7) and keeping each insert parameter-bound beats
-      // building a dynamic VALUES list. step_order is the registry index
-      // and drives ORDER BY on every read path (see migration 0008).
-      for (const [i, step] of steps.entries()) {
-        await tx.query(
-          `INSERT INTO job_steps (job_id, step_name, plain_label, status, step_order)
-                VALUES ($1, $2, $3, 'pending', $4)`,
-          [jobId, step.step_name, step.plain_label, i],
+    const { clientRow: created, jobId } = await db.withTransaction(
+      async (tx) => {
+        const clientInsert = await tx.query<ClientRow>(
+          `INSERT INTO clients (name, company, email, phone, tier)
+                VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, name, company, email, phone, tier, status,
+                       portal_token, created_at, updated_at`,
+          [parsed.name, parsed.company, parsed.email, parsed.phone, parsed.tier],
         );
-      }
+        const row = clientInsert.rows[0];
+        if (row === undefined) {
+          throw new Error('client insert returned no row');
+        }
 
-      await tx.query(
-        `INSERT INTO audit_log (client_id, message, actor)
-              VALUES ($1, $2, $3)`,
-        [clientRow.id, `Client onboarded at tier ${parsed.tier}`, actor],
-      );
+        const jobInsert = await tx.query<{ id: string }>(
+          `INSERT INTO jobs (client_id, status) VALUES ($1, 'pending')
+             RETURNING id`,
+          [row.id],
+        );
+        const newJobId = jobInsert.rows[0]?.id;
+        if (newJobId === undefined) {
+          throw new Error('job insert returned no row');
+        }
 
-      return clientRow;
-    });
+        // One INSERT per step rather than VALUES ($1,$2),($3,$4)... — the row
+        // count is tiny (3-7) and keeping each insert parameter-bound beats
+        // building a dynamic VALUES list. step_order is the registry index
+        // and drives ORDER BY on every read path (see migration 0008).
+        for (const [i, step] of steps.entries()) {
+          await tx.query(
+            `INSERT INTO job_steps (job_id, step_name, plain_label, status, step_order)
+                  VALUES ($1, $2, $3, 'pending', $4)`,
+            [newJobId, step.step_name, step.plain_label, i],
+          );
+        }
 
-    // TODO(commit #15): enqueue a BullMQ provisioning job for `created.id`
-    // here. Until the queue module lands the worker will not pick up the
-    // pending step rows, but the HTTP surface is stable.
+        await tx.query(
+          `INSERT INTO audit_log (client_id, message, actor)
+                VALUES ($1, $2, $3)`,
+          [row.id, `Client onboarded at tier ${parsed.tier}`, actor],
+        );
+
+        return { clientRow: row, jobId: newJobId };
+      },
+    );
+
+    // Enqueue only after the transaction commits — otherwise the worker
+    // could pick up the job before its step rows are visible and see an
+    // empty pending set. If Redis is temporarily down the client row is
+    // already persisted and an admin can requeue via a follow-up action
+    // (the row is still visible in GET /clients with steps_done=0).
+    try {
+      await queue.enqueueJob(jobId);
+    } catch (err: unknown) {
+      logger.error('enqueue failed after client insert', {
+        client_id: created.id,
+        job_id: jobId,
+        message: err instanceof Error ? err.message : 'unknown error',
+      });
+    }
+
     logger.info('clients.created', {
       client_id: created.id,
+      job_id: jobId,
       tier: created.tier,
       step_count: steps.length,
       actor,

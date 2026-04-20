@@ -44,7 +44,7 @@ export function createDb(config: AppConfig, logger: Logger): Db {
   });
 
   pool.on('error', (err: Error) => {
-    logger.error('pg pool error', { message: err.message });
+    logger.error('pg pool error', { error: err.message });
   });
 
   return {

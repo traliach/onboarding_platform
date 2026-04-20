@@ -36,6 +36,13 @@ import { createPortalRouter } from './api/portal';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
 import { createDb, type Db } from './db/pool';
 import { createRootLogger, type Logger } from './logger';
+import {
+  createQueue,
+  createWorker,
+  type JobQueue,
+  type WorkerHandle,
+} from './queue';
+import { createJobProcessor } from './worker/processor';
 
 function formatDetail(detail: unknown): string {
   if (detail instanceof Error) {
@@ -92,7 +99,7 @@ function installCrashHandlers(logger: Logger, db: Db): void {
 
   process.on('uncaughtException', (err: Error) => {
     panicShutdown('uncaught exception', {
-      message: err.message,
+      error: err.message,
       stack: err.stack,
     });
   });
@@ -116,7 +123,12 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
-function startApi(config: AppConfig, db: Db, logger: Logger): void {
+function startApi(
+  config: AppConfig,
+  db: Db,
+  logger: Logger,
+  queue: JobQueue,
+): void {
   const app = express();
   app.disable('x-powered-by');
 
@@ -164,7 +176,7 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
   });
 
   app.use('/auth', createAuthRouter(config, db, logger));
-  app.use('/clients', createClientsRouter(config, db, logger));
+  app.use('/clients', createClientsRouter(config, db, logger, queue));
   app.use('/jobs', createJobsRouter(config, db, logger));
   app.use('/portal', createPortalRouter(config, db, logger));
   app.use('/analytics', createAnalyticsRouter(config, db, logger));
@@ -185,6 +197,11 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
       logger.error('error during server close', { error: describeError(err) });
     }
     try {
+      await queue.close();
+    } catch (err: unknown) {
+      logger.error('error closing queue', { error: describeError(err) });
+    }
+    try {
       await db.close();
       logger.info('api stopped cleanly');
       process.exit(0);
@@ -198,25 +215,24 @@ function startApi(config: AppConfig, db: Db, logger: Logger): void {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-function startWorker(config: AppConfig, db: Db, logger: Logger): void {
+function startWorker(
+  config: AppConfig,
+  db: Db,
+  logger: Logger,
+  worker: WorkerHandle,
+): void {
   logger.info('worker starting', {
     queue: config.queueName,
     node_env: config.nodeEnv,
   });
 
-  // Placeholder heartbeat until the BullMQ consumer + 7 provisioning steps
-  // land. Kept here so operators can verify the worker process is alive via
-  // log aggregation before the queue is wired up. The db pool is created at
-  // boot even though no step handler uses it yet, so both targets exercise
-  // the same bootstrap path.
-  const heartbeatMs = 10_000;
-  const handle = setInterval(() => {
-    logger.info('worker heartbeat', { queue: config.queueName });
-  }, heartbeatMs);
-
   const shutdown = async (signal: string): Promise<void> => {
     logger.info('shutdown signal received', { signal });
-    clearInterval(handle);
+    try {
+      await worker.close();
+    } catch (err: unknown) {
+      logger.error('error closing worker', { error: describeError(err) });
+    }
     try {
       await db.close();
       logger.info('worker stopped cleanly');
@@ -262,9 +278,11 @@ async function main(): Promise<void> {
   }
 
   if (config.appTarget === 'api') {
-    startApi(config, db, logger);
+    const queue = createQueue(config, logger);
+    startApi(config, db, logger, queue);
   } else {
-    startWorker(config, db, logger);
+    const worker = createWorker(config, logger, createJobProcessor(db, logger));
+    startWorker(config, db, logger, worker);
   }
 }
 
