@@ -93,6 +93,32 @@ export interface LoginRequest {
 }
 
 /**
+ * Request body for POST /clients. portal_token, status, and the job + steps
+ * are all generated server-side; the client only provides the human inputs.
+ * phone is optional (sales team does not always collect it).
+ */
+export interface CreateClientRequest {
+  name: string;
+  company: string;
+  email: string;
+  phone: string | null;
+  tier: Tier;
+}
+
+/**
+ * Request body for PATCH /clients/:id. All fields are optional; at least one
+ * must be present. tier and status are immutable via this endpoint — tier
+ * would invalidate the already-enqueued step set, status is derived from
+ * the job's progress.
+ */
+export interface UpdateClientRequest {
+  name?: string;
+  company?: string;
+  email?: string;
+  phone?: string | null;
+}
+
+/**
  * Response body for POST /auth/login and GET /auth/me. The JWT is set via
  * Set-Cookie on login — it is never included in the response body (§10).
  */
