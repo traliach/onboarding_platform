@@ -5,7 +5,7 @@ Accepted
 
 ## Context
 The 5-EC2 fleet lives in a single private subnet with **no public IP on any
-instance** (CLAUDE.md section 4 and section 9). Private EC2s still need:
+instance**. Private EC2s still need:
 
 1. Outbound connectivity to AWS Systems Manager so Session Manager works and
    the SSM agent can register.

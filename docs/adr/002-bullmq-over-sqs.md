@@ -8,9 +8,9 @@ The onboarding platform needs a reliable job queue for provisioning workflows
 (IAM user, S3 scaffold, welcome email, Slack notification). The workflow must
 be resumable, inspectable per step, and observable via Prometheus.
 
-The platform is self-hosted across a 5 EC2 fleet on a $47/month budget
-(CLAUDE.md section 8). Managed AWS services that add cost or complexity are
-out of scope (CLAUDE.md section 16).
+The platform is self-hosted across a 5 EC2 fleet on a $47/month budget. 
+Managed AWS services that add cost or complexity are
+out of scope.
 
 ## Decision
 Use **BullMQ backed by Redis** as the job queue. Redis runs on the worker EC2
@@ -36,8 +36,7 @@ alongside the BullMQ worker process.
 ## Alternatives considered
 - **AWS SQS** — rejected. Adds per-request cost, requires a DLQ plus a
   separate mechanism for step-level status, and pulls in an AWS SDK
-  dependency into a path that does not otherwise need live AWS. Violates
-  section 16 of CLAUDE.md (managed queues are explicitly out of scope).
+  dependency into a path that does not otherwise need live AWS. 
 - **AWS Step Functions** — rejected. Same cost/coupling as SQS, and the
   visual state machine is wasted effort when the workflow is four sequential
   mocked calls.

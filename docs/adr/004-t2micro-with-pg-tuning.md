@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-The fleet is five t2.micro EC2 instances (CLAUDE.md section 4 and section 8).
+The fleet is five t2.micro EC2 instances.
 One of them — the `db` host — runs self-managed PostgreSQL and serves both
 the API and the worker.
 
@@ -15,8 +15,7 @@ untuned, Postgres on t2.micro exhausts memory under even modest load and
 starts swapping against the 1 GiB ceiling, at which point latency collapses
 and the OOM killer gets involved.
 
-Managed databases (RDS, Aurora) are explicitly out of scope (CLAUDE.md
-section 16: "self-managed PostgreSQL is the point"). Upgrading the instance
+Managed databases (RDS, Aurora) are explicitly out of scope. Upgrading the instance
 class to t3.small (2 GiB) would double the DB cost line in the $47/month
 budget.
 
@@ -33,9 +32,6 @@ effective_cache_size   = 256MB
 max_connections        = 20
 ```
 
-These values are **not negotiable** — CLAUDE.md section 17 flags them as a
-portfolio-signal decision. Removing the tuning block is a regression, not an
-optimization.
 
 ## Rationale
 - **`shared_buffers = 128MB`** — ~12.5 % of RAM. Postgres documentation
@@ -59,8 +55,7 @@ optimization.
 - **Upgrade `db` to t3.small** — rejected. Doubles the DB line to ~$16/month
   and defeats the "cost-conscious design" signal in CLAUDE.md section 1.
   Keep this as a documented upgrade path when real production traffic arrives.
-- **RDS db.t3.micro** — rejected. Violates CLAUDE.md section 16
-  (managed DB is out of scope) and costs more than self-managed.
+- **RDS db.t3.micro** — (managed DB is out of scope) and costs more than self-managed.
 - **PgBouncer in front of Postgres** — deferred. Useful later when real
   clients outnumber connections, but adds an operational component not
   needed for a lab-scale onboarding queue that sees bursty, low-volume
