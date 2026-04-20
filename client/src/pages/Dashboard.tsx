@@ -1,12 +1,17 @@
 /**
  * Dashboard — clients tab + analytics tab.
  *
- * This commit ships the shell: tab switcher, active-tab styling, and
- * placeholder content for both tabs. Real ClientList / AnalyticsView
- * components land in the next commit.
+ * The shell is deliberately thin: tab state, tab styling, and two child
+ * components that own their own data fetching. Keeping fetches inside
+ * the tabs means switching tabs re-runs the query, which is the right
+ * behaviour here — operators expect "refresh on tab click" in a tool
+ * this size.
  */
 
 import { useState } from 'react';
+
+import { AnalyticsView } from '../components/AnalyticsView';
+import { ClientList } from '../components/ClientList';
 
 type Tab = 'clients' | 'analytics';
 
@@ -33,8 +38,8 @@ export function Dashboard() {
         </nav>
       </div>
 
-      {tab === 'clients' && <ClientsPlaceholder />}
-      {tab === 'analytics' && <AnalyticsPlaceholder />}
+      {tab === 'clients' && <ClientList />}
+      {tab === 'analytics' && <AnalyticsView />}
     </div>
   );
 }
@@ -60,21 +65,5 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
     >
       {children}
     </button>
-  );
-}
-
-function ClientsPlaceholder() {
-  return (
-    <div className="card p-8 text-center text-sm text-slate-500">
-      Client list lands in the next commit.
-    </div>
-  );
-}
-
-function AnalyticsPlaceholder() {
-  return (
-    <div className="card p-8 text-center text-sm text-slate-500">
-      Analytics view lands in the next commit.
-    </div>
   );
 }
