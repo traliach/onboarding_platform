@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/github/license/traliach/onboarding_platform)
 ![Tag](https://img.shields.io/github/v/tag/traliach/onboarding_platform)
 
-<!-- CI badges (app.yml, infra.yml) added when the workflows land. -->
+<!-- CI badges (client.yml, server.yml, infra.yml) added when the workflows land. -->
 
 ## Overview
 
@@ -40,12 +40,13 @@ deliverables state. Items below will be populated as each phase ships.
 
 ## CI/CD
 
-Two separate workflows:
+Three separate workflows (one per concern, never consolidated):
 
-- `.github/workflows/app.yml` — lint, test, Docker build, push to ECR (on changes to `app/`).
+- `.github/workflows/client.yml` — lint, test, Vite build, Vercel deploy (on changes to `client/`).
+- `.github/workflows/server.yml` — lint, test, Docker build, push to ECR (on changes to `server/`).
 - `.github/workflows/infra.yml` — `terraform plan` on PR, `apply` + Ansible + ALB smoke test on merge (on changes to `infra/` or `monitoring/`).
 
-Neither is wired yet — tracked under Phase 5.
+None are wired yet — tracked under Phase 5.
 
 ## License
 
