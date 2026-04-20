@@ -2,45 +2,50 @@
 
 > Production-representative client onboarding platform — multi-tier AWS, Terraform modules, Ansible fleet config, BullMQ, PostgreSQL, Prometheus/Grafana
 
-![CI](https://github.com/traliach/onboarding_platform/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/github/license/traliach/onboarding_platform)
 ![Tag](https://img.shields.io/github/v/tag/traliach/onboarding_platform)
 
+<!-- CI badges (app.yml, infra.yml) added when the workflows land. -->
+
 ## Overview
 
-<!-- Brief description of the project and what it does -->
+`onboarding_platform` accepts new client submissions via a REST API, enqueues
+a provisioning job (BullMQ + Redis), and tracks each provisioning step
+(IAM user, S3 folder, welcome email, Slack notification) in PostgreSQL with
+full audit logging. Metrics and dashboards cover the entire 5-EC2 fleet.
+
+Provisioning steps are mocked — the portfolio goal is the distributed
+architecture, not live AWS side effects.
+
+## Status
+
+Scaffold phase. See the checklist in the project working doc for the current
+deliverables state. Items below will be populated as each phase ships.
 
 ## Architecture
 
-<!-- Add architecture diagram here -->
-
-## Packages
-
-| Package | Description |
-|---------|-------------|
-| `apps/web` | React + TypeScript frontend |
-| `apps/api` | Node.js + Express backend |
-| `packages/shared` | Shared TypeScript types |
+<!-- Tier diagram lands with docs/architecture.md. -->
 
 ## Quick start
 
-```bash
-git clone https://github.com/traliach/onboarding_platform.git
-cd onboarding_platform
-npm install
-npm run dev
-```
+<!-- `docker compose up` instructions land with docker-compose.yml in Phase 1. -->
 
-## Environment variables
+## Cost
 
-```bash
-cp apps/api/.env.example apps/api/.env
-# fill in values
-```
+<!-- Cost table lands with docs/cost.md in Phase 6. -->
+
+## Observability
+
+<!-- Prometheus + Grafana summary lands with monitoring/ in Phase 4. -->
 
 ## CI/CD
 
-Every push to `main` runs the full pipeline. PRs require all checks to pass before merge.
+Two separate workflows:
+
+- `.github/workflows/app.yml` — lint, test, Docker build, push to ECR (on changes to `app/`).
+- `.github/workflows/infra.yml` — `terraform plan` on PR, `apply` + Ansible + ALB smoke test on merge (on changes to `infra/` or `monitoring/`).
+
+Neither is wired yet — tracked under Phase 5.
 
 ## License
 
