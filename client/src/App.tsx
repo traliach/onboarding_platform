@@ -18,8 +18,10 @@ import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { ClientPage } from './pages/ClientPage';
 import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/LoginPage';
+import { PortalPage } from './pages/PortalPage';
 
 export function App() {
   return (
@@ -27,7 +29,7 @@ export function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/portal/:token" element={<PortalPlaceholder />} />
+          <Route path="/portal/:token" element={<PortalPage />} />
           <Route
             element={
               <ProtectedRoute>
@@ -36,28 +38,12 @@ export function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
-            <Route path="/clients/:id" element={<ClientPagePlaceholder />} />
+            <Route path="/clients/:id" element={<ClientPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  );
-}
-
-function ClientPagePlaceholder() {
-  return (
-    <div className="card p-8 text-center text-sm text-slate-500">
-      Client detail page lands in a later commit.
-    </div>
-  );
-}
-
-function PortalPlaceholder() {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-8 text-sm text-slate-500">
-      Portal lands in a later commit.
-    </div>
   );
 }
 
