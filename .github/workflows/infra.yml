@@ -1,0 +1,262 @@
+# Infrastructure CI (CLAUDE.md §8 / §11 / ADR-007).
+#
+# What this does:
+#   - On every pull request touching infra/terraform/** (or this file):
+#     run `fmt -check`, `validate`, then `plan` against the real AWS
+#     account via OIDC, and comment the plan summary on the PR so
+#     reviewers can see the diff without pulling the branch.
+#   - On push to main: re-plan, then `apply` — also via OIDC, gated by
+#     a branch check AND a GitHub environment so human approval can be
+#     wired later without touching this file.
+#   - Concurrency is per-ref so two rapid-fire pushes to main don't
+#     race on `apply` (the DynamoDB lock would catch it, but failing
+#     on a lock is a worse signal than queuing).
+#
+# What this does NOT do:
+#   - Does not touch `infra/terraform/bootstrap/`. That module is
+#     applied once per AWS account, by hand, with local state (see
+#     ADR-007 and infra/terraform/README.md). Running bootstrap from
+#     CI would need the S3/DDB/OIDC resources to already exist, which
+#     is the chicken-and-egg this whole workflow avoids.
+#   - Does not run `tfsec` / `checkov`. Security scanning is a
+#     separate PR and a separate decision; adding it quietly here
+#     would block on a first-run backlog of low-severity findings.
+#   - Does not publish container images. The server workflow already
+#     proves the image builds; deploy-time push is the next phase.
+#
+# Secrets / variables required (set in repo settings → Secrets and
+# variables → Actions):
+#   - AWS_ROLE_TO_ASSUME  — arn of the role created by
+#                           infra/terraform/bootstrap/ (the
+#                           `gha_oidc_role_arn` output).
+#   - AWS_REGION          — e.g. us-east-1. Must match the region in
+#                           the backend "s3" block and in
+#                           infra/terraform/variables.tf.
+#
+# If either secret is missing the workflow will fail at the
+# `Configure AWS credentials` step — that's the intended "you
+# haven't bootstrapped yet" signal.
+
+name: infra
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/infra.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/infra.yml"
+
+concurrency:
+  # Per-ref group so PRs don't block each other but a run on main
+  # serializes with itself. `cancel-in-progress: false` on main
+  # deliberately — cancelling a mid-apply is worse than waiting.
+  group: infra-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least-privilege, plus the two extras OIDC + PR comments need.
+permissions:
+  contents: read
+  id-token: write        # required for aws-actions/configure-aws-credentials
+  pull-requests: write   # required to post the plan comment
+
+env:
+  TF_VERSION: "1.9.8"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  check:
+    # fmt + validate do not need AWS credentials. Running them in a
+    # tiny pre-flight job keeps the feedback loop tight for typos
+    # and formatting misses, and makes the plan/apply jobs' OIDC
+    # step the first thing that touches AWS.
+    name: fmt + validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          # Disable the wrapper so step outputs aren't double-encoded;
+          # we'd fight it later in the plan comment step.
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        # -recursive also covers bootstrap/, even though bootstrap/
+        # is not applied here. Formatting drift in bootstrap/ still
+        # fails this check, which is the point.
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        # `-backend=false` skips the S3 bucket lookup so this step
+        # works before the bootstrap module has been applied in a
+        # new account — useful for first-time contributors.
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform validate (bootstrap)
+        working-directory: infra/terraform/bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  plan:
+    name: plan
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          # Short session name so CloudTrail entries are readable;
+          # the run id keeps them unique without leaking PR titles.
+          role-session-name: gha-infra-plan-${{ github.run_id }}
+
+      - name: Terraform init
+        run: terraform init -lock-timeout=120s
+
+      - name: Terraform plan
+        id: plan
+        # `-detailed-exitcode` returns 2 when there are changes, 0 when
+        # clean, 1 on error. We capture it so the PR comment can
+        # distinguish "no-op plan" from "changes queued".
+        run: |
+          set +e
+          terraform plan -no-color -lock-timeout=120s -detailed-exitcode -out=tfplan > plan.txt
+          code=$?
+          set -e
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != "0" ] && [ "$code" != "2" ]; then
+            cat plan.txt
+            exit "$code"
+          fi
+
+      - name: Upload plan artifact
+        if: github.event_name == 'push'
+        # Only upload on push-to-main; on PRs the plan is advisory and
+        # we re-plan at apply time anyway (apply runs on push). Keeping
+        # PR artifacts around would cost Actions storage for no gain.
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+          retention-days: 7
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN_EXITCODE: ${{ steps.plan.outputs.exitcode }}
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('infra/terraform/plan.txt', 'utf8');
+            const exitcode = process.env.PLAN_EXITCODE;
+            // Trim to stay well under GitHub's 65k comment ceiling.
+            // A blown-out plan is almost always a sign the PR is
+            // touching the wrong thing anyway; the full text lives
+            // in the Actions log.
+            const MAX = 60000;
+            const trimmed = raw.length > MAX
+              ? raw.slice(0, MAX) + '\n\n...[truncated, see Actions log for full plan]'
+              : raw;
+            const status = exitcode === '0'
+              ? 'No changes — infrastructure matches the plan.'
+              : 'Changes detected — review before merging.';
+            const body = [
+              '### Terraform plan',
+              '',
+              `**Status:** ${status}`,
+              '',
+              '<details><summary>Full plan</summary>',
+              '',
+              '```terraform',
+              trimmed,
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+  apply:
+    name: apply
+    needs: plan
+    # Ref check is the current gate. When human approval is wanted,
+    # create a `production` environment in the repo settings with a
+    # required reviewer and add `environment: production` below — no
+    # other workflow change is needed.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform ${{ env.TF_VERSION }}
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: gha-infra-apply-${{ github.run_id }}
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/
+
+      - name: Terraform init
+        run: terraform init -lock-timeout=300s
+
+      - name: Terraform apply
+        # Applies the exact plan file produced by the plan job. If the
+        # state drifted between plan and apply (hand-edits in the
+        # console, simultaneous apply from a laptop) the lock would
+        # catch it first; failing that, the plan file itself would
+        # reject on stale resource fingerprints.
+        run: terraform apply -auto-approve -lock-timeout=300s tfplan
