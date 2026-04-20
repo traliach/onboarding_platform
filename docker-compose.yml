@@ -1,5 +1,16 @@
 name: onboarding_platform
 
+# Local development stack. Matches production topology (separate api +
+# worker processes sharing one image) so behaviour observed here is the
+# behaviour you'll get on EC2. The api service runs migrations on boot
+# (idempotent — see server/src/db/migrate.ts); the worker waits on the
+# api so it never tries to process a job before its schema exists.
+#
+# env_file pulls shared config from .env (copy .env.example first).
+# The `environment:` block only overrides what MUST differ inside the
+# compose network — DATABASE_URL and REDIS_URL point at service names,
+# APP_TARGET selects api vs worker from the same image.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -31,37 +42,39 @@ services:
 
   api:
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     image: onboarding-platform-server:local
     restart: unless-stopped
+    env_file: .env
     environment:
-      NODE_ENV: development
       APP_TARGET: api
-      PORT: "3000"
-      LOG_LEVEL: info
+      # Override host-oriented .env URLs with service-name DNS so the
+      # container talks to siblings instead of the host's localhost.
       DATABASE_URL: postgres://onboarding:onboarding@postgres:5432/onboarding
       REDIS_URL: redis://redis:6379
-      QUEUE_NAME: client-provisioning
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     ports:
-      - "3000:3000"
-    command: ["sh", "-c", "node src/db/migrate.js && node src/index.js"]
+      - "4000:4000"
+    # Migration runs before the API binds the port so readiness cannot
+    # race ahead of schema creation.
+    command:
+      - sh
+      - -c
+      - node dist/server/src/db/migrate.js && node dist/server/src/index.js
 
   worker:
     image: onboarding-platform-server:local
     restart: unless-stopped
+    env_file: .env
     environment:
-      NODE_ENV: development
       APP_TARGET: worker
-      PORT: "3000"
-      LOG_LEVEL: info
       DATABASE_URL: postgres://onboarding:onboarding@postgres:5432/onboarding
       REDIS_URL: redis://redis:6379
-      QUEUE_NAME: client-provisioning
     depends_on:
       api:
         condition: service_started
@@ -69,7 +82,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["node", "src/index.js"]
+    # Worker has no HTTP port; the image's HEALTHCHECK would fail
+    # forever. Disable it for this service.
+    healthcheck:
+      disable: true
+    command: ["node", "dist/server/src/index.js"]
 
 volumes:
   postgres-data:
