@@ -27,11 +27,12 @@
 
 import type { Job as BullJob } from 'bullmq';
 
+import type { StepName } from '../../../client/src/types';
+import type { ClientRow } from '../db/mappers';
 import type { Db } from '../db/pool';
 import type { Logger } from '../logger';
 import type { JobPayload } from '../queue';
-
-const STEP_STUB_DELAY_MS = 500;
+import { STEP_HANDLERS } from './steps';
 
 interface JobRow {
   id: string;
@@ -55,19 +56,22 @@ function describeError(err: unknown): string {
 }
 
 /**
- * Stub step runner. Commit #16 dispatches on step_name into the real handler
- * registry; for now every step sleeps briefly and reports a canned log line,
- * which is enough to exercise the full state machine end-to-end (POST →
- * enqueue → worker → done). The delay makes mid-run GET /clients/:id polls
- * observable so the live test can catch an in_progress snapshot.
+ * Dispatch a step to its registered handler. Unknown step_name is a coding
+ * error (schema CHECK allows any VARCHAR, but migrations + the registry's
+ * Record<StepName, StepHandler> keep them in sync) — treat it as a
+ * permanent failure so the step is marked failed and surfaces in the UI
+ * instead of silently being skipped.
  */
 async function runStep(
   step: StepRow,
+  client: ClientRow,
   logger: Logger,
 ): Promise<{ log_message: string }> {
-  await new Promise<void>((resolve) => setTimeout(resolve, STEP_STUB_DELAY_MS));
-  logger.debug('stub step executed', { step_name: step.step_name });
-  return { log_message: `${step.step_name} completed (stub)` };
+  const handler = STEP_HANDLERS[step.step_name as StepName];
+  if (handler === undefined) {
+    throw new Error(`no handler registered for step ${step.step_name}`);
+  }
+  return handler({ client, logger });
 }
 
 export function createJobProcessor(db: Db, logger: Logger) {
@@ -91,6 +95,25 @@ export function createJobProcessor(db: Db, logger: Logger) {
         status: jobRow.status,
       });
       return;
+    }
+
+    // Load the full client row once — step handlers need real fields
+    // (name, email, company, tier) to parameterise their log messages.
+    // Reading outside the transaction is fine: clients.id is immutable
+    // and mutable fields aren't semantically required for provisioning.
+    const clientResult = await db.query<ClientRow>(
+      `SELECT id, name, company, email, phone, tier, status,
+              portal_token, created_at, updated_at
+         FROM clients WHERE id = $1`,
+      [jobRow.client_id],
+    );
+    const clientRow = clientResult.rows[0];
+    if (clientRow === undefined) {
+      logger.error('job references missing client row', {
+        job_id: jobId,
+        client_id: jobRow.client_id,
+      });
+      throw new Error(`client ${jobRow.client_id} not found for job ${jobId}`);
     }
 
     if (jobRow.status === 'pending') {
@@ -130,7 +153,7 @@ export function createJobProcessor(db: Db, logger: Logger) {
       });
 
       try {
-        const result = await runStep(step, logger);
+        const result = await runStep(step, clientRow, logger);
         await db.query(
           `UPDATE job_steps
               SET status = 'done',
