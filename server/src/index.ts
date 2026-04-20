@@ -177,7 +177,7 @@ function startApi(
 
   app.use('/auth', createAuthRouter(config, db, logger));
   app.use('/clients', createClientsRouter(config, db, logger, queue));
-  app.use('/jobs', createJobsRouter(config, db, logger));
+  app.use('/jobs', createJobsRouter(config, db, logger, queue));
   app.use('/portal', createPortalRouter(config, db, logger));
   app.use('/analytics', createAnalyticsRouter(config, db, logger));
 

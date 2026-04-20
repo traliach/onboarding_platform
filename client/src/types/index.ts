@@ -156,6 +156,18 @@ export interface JobDetail {
 }
 
 /**
+ * Response body for PATCH /jobs/:id/steps/:stepId/retry. The UI uses both
+ * rows: the step (which flips from 'failed' back to 'pending' with cleared
+ * error_message) and the parent job (which flips from 'failed' back to
+ * 'in_progress'). Returning both avoids a follow-up GET /jobs/:id round
+ * trip before the retry is visible in the dashboard.
+ */
+export interface StepRetryResponse {
+  job: Job;
+  step: JobStep;
+}
+
+/**
  * GET /analytics/summary — powers the Analytics tab.
  * success_rate and failure_rate are fractions in [0, 1].
  */
