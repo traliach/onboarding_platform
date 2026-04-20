@@ -15,3 +15,13 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "github_repo" {
+  description = "GitHub repo that is allowed to assume the OIDC role. Format: `owner/repo`. Required — no default so bootstrap cannot be applied against the wrong account by accident."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$", var.github_repo))
+    error_message = "github_repo must be in `owner/repo` format (e.g. `achille-traore/onboarding_platform`)."
+  }
+}

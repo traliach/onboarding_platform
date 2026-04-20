@@ -17,3 +17,13 @@ output "lock_table_arn" {
   description = "DynamoDB lock table ARN — consumed by the OIDC role's inline policy."
   value       = aws_dynamodb_table.tflocks.arn
 }
+
+output "gha_oidc_role_arn" {
+  description = "ARN of the IAM role that GitHub Actions assumes via OIDC. Paste into the `AWS_ROLE_TO_ASSUME` secret in the repo settings."
+  value       = aws_iam_role.gha_oidc.arn
+}
+
+output "gha_oidc_provider_arn" {
+  description = "ARN of the GitHub OIDC provider — useful for sanity-checking that only one provider exists per account."
+  value       = aws_iam_openid_connect_provider.github.arn
+}
