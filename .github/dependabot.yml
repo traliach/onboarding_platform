@@ -1,13 +1,38 @@
+# Dependabot configuration.
+#
+# The repo is a monorepo (ADR-005): client/ and server/ each own their
+# own package.json + package-lock.json. A single `directory: "/"` entry
+# would scan the repo root, which has no package.json, so updates for
+# either workspace would silently never open.
+#
+# Two npm entries, one per workspace, keep each PR scoped to a single
+# concern and let reviewers read the diff without cross-package noise.
+# Labels mirror the existing issue taxonomy so the board filters stay
+# coherent.
+
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/client"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+      - "client"
+    commit-message:
+      prefix: "chore"
+
+  - package-ecosystem: "npm"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "server"
     commit-message:
       prefix: "chore"
 
@@ -21,3 +46,17 @@ updates:
       - "ci-cd"
     commit-message:
       prefix: "ci"
+
+  # Pins in Dockerfiles (server/Dockerfile, and later Postgres/Redis
+  # variants if we stop pulling from docker-compose directly) travel
+  # through the same weekly cycle so base-image CVEs never go stale.
+  - package-ecosystem: "docker"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
