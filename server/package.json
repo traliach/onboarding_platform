@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "bullmq": "^5.74.2",
+    "bullmq": "^5.75.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "express": "^5.2.1",
