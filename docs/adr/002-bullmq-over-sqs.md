@@ -22,16 +22,18 @@ alongside the BullMQ worker process.
 - **Observability** — BullMQ exposes queue depth, active/completed/failed
   counts, and per-job timing in memory. These map directly onto the Prometheus
   `onboarding_queue_depth`, `onboarding_jobs_completed_total`, and
-  `onboarding_jobs_failed_total` metrics we already register in `app/src/api/metrics.js`.
+  `onboarding_jobs_failed_total` metrics exposed by the server (metrics
+  endpoint lives alongside the other routers in `server/src/api/`).
 - **Developer loop** — BullMQ + Redis run locally under Docker Compose in
   seconds, with no AWS account or LocalStack mocking needed.
-- **Fit with Node-first stack** — the API and worker both run on Node, share
-  the same TypeScript-free codebase, and can share the same Dockerfile with
+- **Fit with Node-first stack** — the API and worker both run on Node +
+  TypeScript, share the same `server/` package, and are produced by a single
+  Dockerfile (`server/Dockerfile`) whose runtime is selected by
   `APP_TARGET=api|worker`.
 - **Step-level state** — per-step status (`pending`, `in_progress`, `done`,
-  `failed`) is persisted to PostgreSQL (`job_steps` table, migration
-  `003_job_steps.sql`). The queue only needs to coordinate attempts; durable
-  workflow state is in Postgres regardless of the queue layer.
+  `failed`) is persisted to PostgreSQL (`job_steps` table, migrations under
+  `server/src/db/migrations/`). The queue only needs to coordinate attempts;
+  durable workflow state is in Postgres regardless of the queue layer.
 
 ## Alternatives considered
 - **AWS SQS** — rejected. Adds per-request cost, requires a DLQ plus a
@@ -58,6 +60,6 @@ alongside the BullMQ worker process.
 - BullMQ metrics are scraped by the Prometheus EC2 off the app's `/metrics`
   endpoint; the worker does not expose its own HTTP port.
 - If we later need multi-region or fan-out, the queue layer can be swapped by
-  replacing `app/src/queue.js` and `app/src/worker/index.js` only — the API
-  route handlers interact with the queue exclusively through the injected
-  `enqueueProvisioning` function.
+  replacing `server/src/queue/index.ts` and `server/src/worker/processor.ts`
+  only — the API route handlers interact with the queue exclusively through
+  the injected `JobQueue` dependency.
