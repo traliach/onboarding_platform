@@ -9,7 +9,9 @@
 ![License](https://img.shields.io/github/license/traliach/onboarding_platform)
 ![Tag](https://img.shields.io/github/v/tag/traliach/onboarding_platform)
 
-<!-- CI badges (client.yml, server.yml, infra.yml) added when the workflows land. -->
+[![server](https://github.com/traliach/onboarding_platform/actions/workflows/server.yml/badge.svg)](https://github.com/traliach/onboarding_platform/actions/workflows/server.yml)
+[![client](https://github.com/traliach/onboarding_platform/actions/workflows/client.yml/badge.svg)](https://github.com/traliach/onboarding_platform/actions/workflows/client.yml)
+[![infra](https://github.com/traliach/onboarding_platform/actions/workflows/infra.yml/badge.svg)](https://github.com/traliach/onboarding_platform/actions/workflows/infra.yml)
 
 ---
 
@@ -40,53 +42,52 @@ surface, and the infrastructure story, not the integrations themselves.
 
 ## Status
 
-| Tier              | State                                                   |
-|-------------------|---------------------------------------------------------|
-| Backend           | **Complete.** API, worker, auth, analytics, tier-based step registry, retry endpoint, Docker image, backend test suite (33 tests). |
-| Local stack       | **Complete.** `docker compose up` runs API + worker + Postgres + Redis + migrations + seed. |
-| Frontend          | Scaffold only (types, tsconfig). React app pending.     |
-| Terraform modules | Scaffold only. Networking, security, compute, ALB, SSM endpoints pending. |
-| Ansible roles     | Scaffold only. common, app, worker, db, prometheus, grafana pending. |
-| Monitoring config | Pending — `prometheus.yml`, `alerts.yml`, dashboards.   |
-| CI/CD             | Pending — three path-scoped workflows.                  |
-| Docs              | ADRs 001-006 complete; `cost.md` complete; `architecture.md` and `runbook.md` pending (land with infra). |
+| Area | State |
+|------|-------|
+| Backend | **Complete.** API, worker, dual auth (JWT + UUID token), analytics, tier-based step registry, retry endpoint, Docker image, 33-test suite. |
+| Frontend | **Complete.** Dashboard (clients + analytics tabs), portal page, login, client detail with live step polling and retry UI. Deployed to Vercel free tier. |
+| Local stack | **Complete.** `docker compose up` starts the full backend in one command. |
+| Terraform | **Complete.** VPC, security groups (per-tier SG segmentation), 5 × t2.micro EC2s, ALB, SSM VPC endpoints, S3 remote state + DynamoDB locking, GitHub OIDC role. |
+| Ansible | **Complete.** Six idempotent roles (common, db, worker, app, prometheus, grafana) run in order by a single master playbook over SSM. |
+| Monitoring | **Complete.** `monitoring/` holds Prometheus scrape config + 4 alert rules + 2 provisioned Grafana dashboards. Ansible deploys from the repo — nothing is hand-configured on the EC2. |
+| CI/CD | **Complete.** Three path-scoped workflows. `server.yml` builds + pushes to ECR on main. `infra.yml` runs `terraform apply` + Ansible + ALB smoke test on merge. |
+| Docs | **Complete.** 8 ADRs, `cost.md`, `architecture.md`, `runbook.md`. |
 
-The project is built in small, reviewable commits with plain-English
-messages (see `git log --oneline`). The exact checklist lives in the
-working document used to coordinate AI-assisted commits across sessions.
+Built commit-by-commit with plain-English messages — `git log --oneline` is
+the change history.
 
 ## Architecture
 
 ```
-                          ┌──────────────────┐
-  Browser ───HTTPS────►   │  ALB (public)    │
-  (Vercel frontend)       └──────┬───────────┘
-                                 │ TLS
-                 ┌───────────────┼────────────────┐
-                 │               │                │
-                 ▼               ▼                ▼
-          ┌──────────┐    ┌──────────┐    ┌──────────┐
-          │  app EC2 │    │ grafana  │    │  (ALB    │
-          │ (API)    │    │  EC2     │    │  target  │
-          └────┬─────┘    └─────┬────┘    │  groups) │
-               │                │          └──────────┘
-               │                │
-               ▼                ▼
-          ┌──────────┐    ┌──────────┐    ┌──────────┐
-          │ worker   │    │ prom EC2 │    │  db EC2  │
-          │ EC2      │    │          │    │ Postgres │
-          │ + Redis  │    │ scrapes  │    │          │
-          └──────────┘    │ all 5    │    └──────────┘
-                          │ tiers    │
-                          └──────────┘
+                        ┌────────────────────────────┐
+  Browser / Vercel ─────►  ALB  (public, port 80)    │
+                        └──────────────┬─────────────┘
+                                       │ :3000
+                              private subnet only
+                        ┌──────────────▼─────────────┐
+                        │  app EC2  (Express API)     │
+                        └──┬──────────────────────┬──┘
+                     :5432 │                :6379  │
+              ┌────────────▼──────┐  ┌────────────▼──────┐
+              │  db EC2           │  │  worker EC2        │
+              │  PostgreSQL 16    │◄─│  BullMQ + Redis    │
+              └───────────────────┘  └───────────────────┘
+                     :9100 ▲               :9100 ▲
+              ┌────────────┴───────────────────┐
+              │  prometheus EC2  (:9090)        │
+              └───────────────────────────────┬─┘
+                                              │ :9090
+                                  ┌───────────▼──────┐
+                                  │  grafana EC2      │
+                                  │  (:3000 via SSM)  │
+                                  └──────────────────┘
 
-     All EC2s are private — no public IPs. Port 22 is closed.
-     Shell access via SSM Session Manager only (no bastion, no SSH keys).
-     Outbound AWS access via VPC endpoints (no NAT gateway).
+  Port 22 closed. Shell access: SSM Session Manager only.
+  No NAT gateway — SSM/ECR traffic via VPC interface endpoints.
 ```
 
-Full diagram, security-group matrix, and data flow will land in
-`docs/architecture.md` alongside the Terraform modules.
+Full tier diagram, security-group matrix (exact ports), and data-flow
+walkthrough: [`docs/architecture.md`](./docs/architecture.md).
 
 ## Quick start — local backend
 
@@ -189,39 +190,36 @@ beats the ~$2-3/month delta from consolidating onto one t3.small).
 
 ## CI/CD
 
-Three separate GitHub Actions workflows, path-scoped — a CSS fix never
-runs Terraform, an infra change never runs Vite. See **ADR-005** for
-the monorepo rationale.
+Three path-scoped GitHub Actions workflows — a CSS change never triggers
+Terraform, an infra change never deploys the frontend. See [ADR-008](./docs/adr/008-ci-cd-pipeline.md).
 
-- `.github/workflows/client.yml` — lint → test → `vite build` → Vercel
-  deploy (on changes under `client/`).
-- `.github/workflows/server.yml` — lint → test → Docker build → push ECR
-  (on changes under `server/`).
-- `.github/workflows/infra.yml` — `terraform plan` on PR →
-  `terraform apply` + Ansible + ALB smoke test on merge (on changes
-  under `infra/` or `monitoring/`).
+| Workflow | Trigger path | On PR | On merge to main |
+|----------|-------------|-------|-----------------|
+| `client.yml` | `client/` | lint, typecheck, test, build | + Vercel deploy |
+| `server.yml` | `server/` | lint, typecheck, test, Docker build | + push to ECR |
+| `infra.yml` | `infra/`, `monitoring/` | fmt + validate + plan (posted as PR comment) | + apply + Ansible + ALB smoke test |
 
-None are wired yet — pending the Terraform and Ansible work.
+AWS authentication is OIDC — no static access keys in GitHub secrets.
 
 ## Repository layout
 
 ```
-client/       React 19 + Vite + Tailwind frontend (pending)
-server/       Node.js + TypeScript API + BullMQ worker (complete)
+client/         React 19 + Vite + Tailwind — dashboard + portal
+server/         Node.js + TypeScript — Express API, BullMQ worker, Docker image
 infra/
-  terraform/  VPC, security, compute, ALB, SSM endpoints (pending)
-  ansible/    common, app, worker, db, prometheus, grafana roles (pending)
-monitoring/   Prometheus scrape + alerts, Grafana dashboards (pending)
+  terraform/    VPC, security groups, 5 × EC2, ALB, SSM endpoints + bootstrap
+  ansible/      six idempotent roles, master playbook, vault-encrypted secrets
+monitoring/     Prometheus config + alert rules + Grafana dashboard JSON
+scripts/        render-inventory.sh — Terraform outputs → Ansible hosts.yml
 docs/
-  adr/        Architecture Decision Records (001-006 complete)
-  cost.md     Full cost breakdown
-  architecture.md  (pending)
-  runbook.md       (pending)
-CLAUDE.md     Working rules for AI-assisted development (private)
-docker-compose.yml
+  adr/          001–008 Architecture Decision Records
+  architecture.md  tier diagram, SG matrix, data flow
+  runbook.md       deploy, teardown, SSM shell, Ansible per-host
+  cost.md          full $47/month breakdown
+.github/workflows/  client.yml, server.yml, infra.yml
+docker-compose.yml  local backend: postgres, redis, api, worker
+.env.example        all required env vars documented
 ```
-
-Full tree, with per-file purpose comments, is in CLAUDE.md section 3.
 
 ## License
 
