@@ -31,6 +31,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { createAnalyticsRouter } from './api/analytics';
 import { createAuthRouter } from './api/auth';
 import { createClientsRouter } from './api/clients';
+import { createInviteRouter } from './api/invite';
 import { createJobsRouter } from './api/jobs';
 import { createPortalRouter } from './api/portal';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
@@ -176,6 +177,7 @@ function startApi(
   });
 
   app.use('/auth', createAuthRouter(config, db, logger));
+  app.use('/auth', createInviteRouter(config, db, logger));
   app.use('/clients', createClientsRouter(config, db, logger, queue));
   app.use('/jobs', createJobsRouter(config, db, logger, queue));
   app.use('/portal', createPortalRouter(config, db, logger));

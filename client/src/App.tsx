@@ -3,9 +3,10 @@
  *
  * Route map (CLAUDE.md section 3):
  *   /login                public — LoginPage
- *   /portal/:token        public — PortalPage (lands in commit 29)
+ *   /register/:token      public — RegisterPage (invite-only registration)
+ *   /portal/:token        public — PortalPage
  *   /                     protected — Layout > Dashboard
- *   /clients/:id          protected — Layout > ClientPage (lands in commit 29)
+ *   /clients/:id          protected — Layout > ClientPage
  *   *                     fallback — 404
  *
  * AuthProvider wraps the whole tree so both branches of the router can
@@ -22,6 +23,7 @@ import { ClientPage } from './pages/ClientPage';
 import { Dashboard } from './pages/Dashboard';
 import { LoginPage } from './pages/LoginPage';
 import { PortalPage } from './pages/PortalPage';
+import { RegisterPage } from './pages/RegisterPage';
 
 export function App() {
   return (
@@ -29,6 +31,7 @@ export function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register/:token" element={<RegisterPage />} />
           <Route path="/portal/:token" element={<PortalPage />} />
           <Route
             element={

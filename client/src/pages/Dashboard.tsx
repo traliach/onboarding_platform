@@ -12,17 +12,28 @@ import { useState } from 'react';
 
 import { AnalyticsView } from '../components/AnalyticsView';
 import { ClientList } from '../components/ClientList';
+import { InviteUserModal } from '../components/InviteUserModal';
 
 type Tab = 'clients' | 'analytics';
 
 export function Dashboard() {
   const [tab, setTab] = useState<Tab>('clients');
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+        <button
+          type="button"
+          onClick={() => setInviteOpen(true)}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Invite user
+        </button>
       </div>
+
+      {inviteOpen && <InviteUserModal onClose={() => setInviteOpen(false)} />}
 
       <div className="mb-4 border-b border-slate-200">
         <nav className="-mb-px flex gap-6" aria-label="Tabs">

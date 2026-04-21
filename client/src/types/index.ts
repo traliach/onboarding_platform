@@ -223,3 +223,35 @@ export interface PortalView {
   steps: PortalStep[];
   human_tasks: PortalHumanTask[];
 }
+
+/**
+ * POST /auth/invite request body.
+ */
+export interface InviteRequest {
+  email: string;
+}
+
+/**
+ * POST /auth/invite response — token + metadata; the registration URL is
+ * constructed client-side as window.location.origin + /register/:token.
+ */
+export interface InviteResponse {
+  token: string;
+  email: string;
+  expires_at: string;
+}
+
+/**
+ * GET /auth/invite/:token response when the token is valid.
+ */
+export interface InviteValidationResponse {
+  email: string;
+  valid: true;
+}
+
+/**
+ * POST /auth/register/:token request body.
+ */
+export interface RegisterRequest {
+  password: string;
+}

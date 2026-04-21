@@ -23,9 +23,13 @@ import type {
   ClientDetail,
   ClientListEntry,
   CreateClientRequest,
+  InviteRequest,
+  InviteResponse,
+  InviteValidationResponse,
   JobDetail,
   LoginRequest,
   PortalView,
+  RegisterRequest,
   StepRetryResponse,
   UpdateClientRequest,
 } from '../types';
@@ -136,6 +140,15 @@ export const auth = {
   },
   me(signal?: AbortSignal): Promise<AuthResponse> {
     return request<AuthResponse>('/auth/me', { signal });
+  },
+  invite(body: InviteRequest): Promise<InviteResponse> {
+    return request<InviteResponse>('/auth/invite', { method: 'POST', body });
+  },
+  validateInvite(token: string, signal?: AbortSignal): Promise<InviteValidationResponse> {
+    return request<InviteValidationResponse>(`/auth/invite/${token}`, { signal });
+  },
+  register(token: string, body: RegisterRequest): Promise<AuthResponse> {
+    return request<AuthResponse>(`/auth/register/${token}`, { method: 'POST', body });
   },
 };
 
