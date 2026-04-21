@@ -1,0 +1,22 @@
+---
+# Entry point for the common role. Keep this file boring —
+# implementation lives in the imported files so each file has a
+# single responsibility and a git diff of the role reads as
+# "packages changed" or "swap changed" rather than "common changed".
+
+- name: Set system timezone to UTC
+  community.general.timezone:
+    name: UTC
+  # Rationale: every log line, every Prometheus timestamp, every
+  # migration started_at lives in UTC already. A mismatched
+  # /etc/localtime produces confusing dual-timestamp log lines when
+  # grep-ing CloudTrail against journalctl.
+
+- name: Install baseline packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Configure swap file
+  ansible.builtin.import_tasks: swap.yml
+
+- name: Install node_exporter
+  ansible.builtin.import_tasks: node_exporter.yml

@@ -40,3 +40,8 @@ collections:
   # Grafana side of monitoring/ without touching the UI.
   - name: community.grafana
     version: ">=2.0.0"
+
+  # ansible.posix provides the mount module (swap fstab entry) and
+  # the sysctl module (vm.swappiness in the common role).
+  - name: ansible.posix
+    version: ">=1.5.0"

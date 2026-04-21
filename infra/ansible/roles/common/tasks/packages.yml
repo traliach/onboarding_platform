@@ -1,0 +1,41 @@
+---
+# Packages every host in the fleet needs.
+#
+# Intentionally minimal: this list is read on every play, on every
+# host, on every site.yml run. Every package added here is a package
+# that must be pulled through the ECR/S3 VPC endpoints on five EC2s
+# during every convergence. Role-specific packages go in the
+# relevant role, not here.
+
+- name: Update system packages (Amazon Linux 2023)
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest    # noqa package-latest — we intentionally track upstream on baseline
+    update_cache: true
+  # `latest` on the baseline is the correct default for this tier.
+  # Security patches for openssl/kernel land silently in AL2023 and
+  # we don't want to version-pin the entire OS to dodge a noqa lint.
+
+- name: Ensure core utilities are installed
+  ansible.builtin.dnf:
+    name:
+      - python3          # required by every Ansible module
+      - python3-pip
+      - jq               # debugging + some role tasks parse JSON
+      - tar              # node_exporter archive extraction
+      - gzip
+      - unzip
+      - curl
+      - ca-certificates
+      - awscli-2         # SSM, ECR login, debugging
+    state: present
+
+- name: Ensure SSM agent is running
+  ansible.builtin.systemd:
+    name: amazon-ssm-agent
+    state: started
+    enabled: true
+  # The SSM agent ships preinstalled on AL2023 and is what lets us
+  # even be on this host right now. Still, a previous hand-pokery
+  # could have disabled it; this line makes the desired state
+  # explicit and idempotent.

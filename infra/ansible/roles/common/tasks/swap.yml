@@ -1,0 +1,71 @@
+---
+# Swap file — turns a t2.micro OOM kill into a slow query.
+#
+# On a 1GB instance, postgres on the db host or the Node.js app on
+# the app host will occasionally spike over 900MB real RAM. Without
+# swap, the OOM killer picks the largest process (always the one
+# doing real work) and site.yml then shows up looking clean, the
+# failure only visible as a systemd restart. With swap, the spike
+# writes to EBS briefly and the service survives.
+#
+# gp3 at 3000 IOPS baseline handles the occasional swap write
+# without a noticeable latency cost. If swap usage becomes
+# continuous (check node_exporter's node_memory_SwapUsed_bytes),
+# that is a signal to move that tier off t2.micro, not to enlarge
+# swap further.
+
+- name: Check if swap file already exists
+  ansible.builtin.stat:
+    path: "{{ common_swap_file_path }}"
+  register: swap_file
+
+- name: Create swap file
+  ansible.builtin.command:
+    cmd: "fallocate -l {{ common_swap_file_size_mb }}M {{ common_swap_file_path }}"
+  when: not swap_file.stat.exists
+  changed_when: true
+
+- name: Set swap file permissions
+  ansible.builtin.file:
+    path: "{{ common_swap_file_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  # 0600 is required; mkswap refuses to operate on a world-readable
+  # file and for good reason — the contents include anything the
+  # kernel paged out.
+
+- name: Format swap file
+  ansible.builtin.command:
+    cmd: "mkswap {{ common_swap_file_path }}"
+  when: not swap_file.stat.exists
+  changed_when: true
+
+- name: Enable swap file
+  ansible.builtin.command:
+    cmd: "swapon {{ common_swap_file_path }}"
+  when: not swap_file.stat.exists
+  changed_when: true
+
+- name: Make swap persistent across reboots
+  ansible.posix.mount:
+    name: none
+    src: "{{ common_swap_file_path }}"
+    fstype: swap
+    opts: sw
+    state: present
+  # Using the mount module over manual fstab editing keeps the line
+  # reproducible and refuses to write a duplicate entry if the role
+  # runs twice.
+
+- name: Tune swappiness low
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "10"
+    state: present
+    sysctl_set: true
+    reload: true
+  # swappiness=10 tells the kernel to prefer dropping page cache
+  # over swapping anonymous memory. On a 1GB box with plenty of
+  # page cache and almost no idle processes, that is the right
+  # bias — we only want swap as a safety net.

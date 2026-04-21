@@ -1,0 +1,22 @@
+---
+# Role metadata — consumed by ansible-galaxy and by other roles that
+# might list common as a dependency. We keep dependencies empty on
+# purpose: site.yml enforces role order. Declaring `dependencies:
+# [common]` on every other role creates redundant traversal and hides
+# the ordering intent in a file nobody reads.
+
+galaxy_info:
+  role_name: common
+  namespace: onboarding_platform
+  description: >-
+    Baseline configuration applied to every EC2 in the fleet —
+    package updates, timezone, swap file, node_exporter for
+    Prometheus scraping.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Amazon
+      versions:
+        - "2023"
+
+dependencies: []
