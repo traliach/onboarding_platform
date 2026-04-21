@@ -46,11 +46,17 @@ on:
   pull_request:
     paths:
       - "infra/terraform/**"
+      - "infra/ansible/**"
+      - "monitoring/**"
+      - "scripts/render-inventory.sh"
       - ".github/workflows/infra.yml"
   push:
     branches: [main]
     paths:
       - "infra/terraform/**"
+      - "infra/ansible/**"
+      - "monitoring/**"
+      - "scripts/render-inventory.sh"
       - ".github/workflows/infra.yml"
 
 concurrency:
