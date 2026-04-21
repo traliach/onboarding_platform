@@ -1,0 +1,42 @@
+# Ansible Galaxy collections required by this project.
+#
+# Install with:
+#   ansible-galaxy collection install -r requirements.yml
+#
+# CI runs the same command before `ansible-playbook`. Version
+# constraints are lower-bounds only — upper bounds break the build
+# every time a collection does a normal minor release, and the value
+# of pinning an upper bound is marginal at this scale.
+
+collections:
+  # AWS-native modules (ec2_instance, s3_object, iam_role, etc.) and
+  # the aws_ec2 dynamic inventory plugin.
+  - name: amazon.aws
+    version: ">=7.0.0"
+
+  # The aws_ssm connection plugin lives here, not in amazon.aws.
+  # Without this collection, every SSM connection attempt fails with
+  # "plugin not found".
+  - name: community.aws
+    version: ">=7.0.0"
+
+  # `postgresql_user`, `postgresql_db`, `postgresql_privs` — the db
+  # role uses them for seeding the onboarding_platform database
+  # without shelling out to psql.
+  - name: community.postgresql
+    version: ">=3.0.0"
+
+  # Kitchen-sink collection — needed for ini_file, timezone, and the
+  # archive module used to download node_exporter binaries.
+  - name: community.general
+    version: ">=8.0.0"
+
+  # docker_login + docker_container for pulling the server image from
+  # ECR on the app/worker hosts.
+  - name: community.docker
+    version: ">=3.0.0"
+
+  # grafana_datasource + grafana_dashboard — used to provision the
+  # Grafana side of monitoring/ without touching the UI.
+  - name: community.grafana
+    version: ">=2.0.0"

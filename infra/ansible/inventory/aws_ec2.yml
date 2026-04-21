@@ -1,0 +1,75 @@
+# Dynamic inventory — built from the live state of the AWS account,
+# never hand-edited. CLAUDE.md §5 forbids hand-edited inventories.
+#
+# How it works:
+#   1. amazon.aws.aws_ec2 calls DescribeInstances filtered by our
+#      project tag. This returns only this fleet's EC2s even if the
+#      account hosts unrelated workloads.
+#   2. Each instance becomes a host. `hostnames: [tag:Name]` makes
+#      the inventory read as `onboarding-platform-app`, not as a
+#      random i-0abcdef... which would be unreadable in the site.yml
+#      logs.
+#   3. `keyed_groups` makes a group called `role_<tier>` for each
+#      Role tag value. site.yml targets `role_app`, `role_db`, etc.
+#   4. `compose` sets per-host vars so the aws_ssm connection plugin
+#      knows which instance id to talk to (NOT the private IP — SSM
+#      addresses by instance id) and which S3 bucket to use for
+#      file transfer.
+#
+# SSM-specific: the aws_ssm connection plugin requires an S3 bucket
+# for file transfer, because SSM's SendCommand is size-limited. The
+# bucket is `${project_name}-ansible-ssm` and is created by the
+# root Terraform module (NOT bootstrap — it is fleet-scoped and
+# destroyed with the fleet). If the bucket does not exist, every
+# `ansible-playbook` run will fail at the first `copy` or `template`
+# task with `NoSuchBucket`. Fix = run `terraform apply` on the root
+# module, not a workaround in this file.
+
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - us-east-1
+
+# Project tag comes from the root Terraform module's default tags
+# block. Never hardcode a company or account identifier here.
+filters:
+  "tag:Project": onboarding-platform
+  instance-state-name:
+    - pending
+    - running
+
+# Human-readable hostnames: `onboarding-platform-app`, etc.
+# The tag is set by the compute module and is also the instance
+# Name tag, so this matches what you'd see in the EC2 console.
+hostnames:
+  - tag:Name
+
+# Group each host by its Role tag. In site.yml we target
+# `role_app`, `role_worker`, etc. — never `all except db`.
+keyed_groups:
+  - key: tags.Role
+    prefix: role
+    separator: "_"
+
+# Per-host connection variables — computed once at inventory time.
+compose:
+  # SSM addresses by instance id, not IP.
+  ansible_host: instance_id
+
+  # Connection plugin — do NOT change to ssh. Port 22 is closed on
+  # every EC2 per CLAUDE.md §10.
+  ansible_connection: "'aws_ssm'"
+  ansible_aws_ssm_region: "'us-east-1'"
+  ansible_aws_ssm_bucket_name: "'onboarding-platform-ansible-ssm'"
+
+  # Silence "Executable python not found" — AL2023 ships /usr/bin/python3.
+  ansible_python_interpreter: "'/usr/bin/python3'"
+
+# Cache inventory lookups for one minute. Long enough to dedupe
+# repeated `ansible-inventory --list` calls during a single run,
+# short enough that a terraform apply followed by ansible-playbook
+# sees the new instance without manual cache invalidation.
+cache: true
+cache_plugin: jsonfile
+cache_connection: /tmp/onboarding-platform-ansible-cache
+cache_timeout: 60

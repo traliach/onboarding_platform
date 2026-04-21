@@ -1,0 +1,31 @@
+# Python runtime dependencies for Ansible in this project.
+#
+# Install into a project-local venv:
+#   python -m venv .venv
+#   source .venv/bin/activate       # or .venv/Scripts/activate on Windows
+#   pip install -r requirements.txt
+#
+# Then fetch the collections:
+#   ansible-galaxy collection install -r requirements.yml
+#
+# CI does both in one step. Local dev benefits from the venv.
+
+# ansible-core 2.16 is the current LTS (supported until 2025-11).
+# The full `ansible` community distribution is NOT installed — it
+# pulls in ~120 collections we don't use and doubles install time.
+ansible-core>=2.16,<2.18
+
+# boto3/botocore are required by amazon.aws and community.aws for
+# every API call. The collections declare them as dependencies but
+# do not install them automatically.
+boto3>=1.34
+botocore>=1.34
+
+# The aws_ssm connection plugin shells out to `aws ssm start-session`
+# and therefore needs the AWS CLI v2 available on PATH. CLI v2 is not
+# a pip package — it's installed system-wide (brew, apt, or the AWS
+# installer). Documented here so nobody thinks pip install is enough.
+
+# Used by the aws_ec2 inventory plugin to cache lookups — installed
+# explicitly to avoid a runtime DeprecationWarning.
+jmespath>=1.0

@@ -1,0 +1,43 @@
+# Example of what group_vars/all/vault.yml must contain.
+#
+# The real vault.yml is gitignored (see .gitignore) and must be
+# encrypted with `ansible-vault encrypt vault.yml`. Never commit the
+# real file, encrypted or otherwise — a committed encrypted vault is
+# a recoverable secret once the password leaks, and in a portfolio
+# project the password will leak the minute the repo goes public.
+#
+# CLAUDE.md §5: every key is prefixed `onboarding_platform_`. No
+# company, client, or person identifiers.
+#
+# To set up locally:
+#   1. Copy this file to vault.yml, replace the placeholder values.
+#   2. Run `ansible-vault encrypt vault.yml` and enter a password.
+#   3. Save that password to .vault-pass (gitignored) OR export
+#      ANSIBLE_VAULT_PASSWORD_FILE=/path/to/password.
+#
+# For CI:
+#   - Store the vault password in GitHub secret ANSIBLE_VAULT_PASSWORD.
+#   - infra.yml writes it to a temp file and points
+#     ANSIBLE_VAULT_PASSWORD_FILE at it before running ansible-playbook.
+
+# PostgreSQL password for the app/worker role. Minimum 24 random
+# characters. Never reuse across environments.
+onboarding_platform_db_password: "CHANGE_ME_BEFORE_ENCRYPTING"
+
+# Used by the server's JWT middleware. Minimum 32 random characters
+# (CLAUDE.md §10). Rotating this invalidates every issued JWT —
+# acceptable for a forced logout, not for a routine config change.
+onboarding_platform_jwt_secret: "CHANGE_ME_BEFORE_ENCRYPTING"
+
+# Grafana admin user — the only Grafana account created by the
+# grafana role. Every other dashboard/datasource is provisioned as
+# code and does not need user-level auth.
+onboarding_platform_grafana_admin_password: "CHANGE_ME_BEFORE_ENCRYPTING"
+
+# ECR registry login credentials — NOT an access key. The app and
+# worker hosts assume the EC2 SSM role, which has ECR read, and call
+# `aws ecr get-login-password` at pull time. This field is reserved
+# for a future case where the worker needs to pull from a registry
+# that doesn't support instance-profile auth (Docker Hub rate limit,
+# GitHub Container Registry from a private repo, etc.).
+onboarding_platform_extra_registry_password: ""
