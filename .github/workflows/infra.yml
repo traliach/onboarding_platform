@@ -26,16 +26,19 @@
 #
 # Secrets / variables required (set in repo settings → Secrets and
 # variables → Actions):
-#   - AWS_ROLE_TO_ASSUME  — arn of the role created by
-#                           infra/terraform/bootstrap/ (the
-#                           `gha_oidc_role_arn` output).
-#   - AWS_REGION          — e.g. us-east-1. Must match the region in
-#                           the backend "s3" block and in
-#                           infra/terraform/variables.tf.
+#   - AWS_ROLE_TO_ASSUME       — ARN of the OIDC role created by
+#                                infra/terraform/bootstrap/ (the
+#                                `gha_oidc_role_arn` output).
+#   - AWS_REGION               — e.g. us-east-1. Must match the region
+#                                in the backend "s3" block and in
+#                                infra/terraform/variables.tf.
+#   - ANSIBLE_VAULT_PASSWORD   — password used to decrypt
+#                                infra/ansible/group_vars/all/vault.yml
+#                                (required by the apply job only).
 #
-# If either secret is missing the workflow will fail at the
-# `Configure AWS credentials` step — that's the intended "you
-# haven't bootstrapped yet" signal.
+# If AWS_ROLE_TO_ASSUME or AWS_REGION is missing the workflow fails at
+# `Configure AWS credentials` — that's the intended "you haven't
+# bootstrapped yet" signal.
 
 name: infra
 
@@ -260,3 +263,47 @@ jobs:
         # catch it first; failing that, the plan file itself would
         # reject on stale resource fingerprints.
         run: terraform apply -auto-approve -lock-timeout=300s tfplan
+
+      - name: Get Terraform outputs
+        id: tf-outputs
+        run: echo "alb_dns=$(terraform output -raw alb_dns_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Render Ansible inventory
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/render-inventory.sh
+
+      - name: Install Ansible and collections
+        run: |
+          pip install --quiet ansible boto3 botocore
+          ansible-galaxy collection install -r "$GITHUB_WORKSPACE/infra/ansible/requirements.yml" --force
+
+      - name: Run Ansible
+        working-directory: ${{ github.workspace }}/infra/ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "false"
+          ANSIBLE_FORCE_COLOR: "true"
+        run: |
+          printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > /tmp/.vault-pass
+          chmod 600 /tmp/.vault-pass
+          ansible-playbook playbooks/site.yml \
+            --vault-password-file /tmp/.vault-pass
+          rm -f /tmp/.vault-pass
+
+      - name: Smoke test — ALB health endpoint
+        # Polls /health for up to 6 minutes (12 × 30s). Failing the
+        # health check fails the workflow — the pipeline does not
+        # report success if the app is unreachable on the ALB.
+        run: |
+          url="http://${{ steps.tf-outputs.outputs.alb_dns }}/health"
+          echo "Probing $url"
+          for i in $(seq 1 12); do
+            if curl -sf --max-time 10 "$url"; then
+              echo ""
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/12 failed — retrying in 30s"
+            sleep 30
+          done
+          echo "Health check timed out after 6 minutes" >&2
+          exit 1

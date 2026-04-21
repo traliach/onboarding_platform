@@ -122,17 +122,55 @@ jobs:
       - name: Build image
         uses: docker/build-push-action@v6
         with:
-          context: ./server
-          file: ./server/Dockerfile
-          # Intentionally no `push: true` and no registry login. A
-          # local build proves the Dockerfile compiles on the CI
-          # runner's architecture; that's the whole signal we need
-          # for a PR check.
+          # Context must be repo root — server/tsconfig.json reads
+          # ../client/src/types/index.ts. See Dockerfile header comment.
+          context: .
+          file: server/Dockerfile
           push: false
           load: true
           tags: onboarding-server:ci
-          # GHA cache is free for public repos and tiny for private
-          # ones at this image size. Without it a cold build runs
-          # `npm ci` twice (build stage + runtime stage) on every PR.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  push:
+    # Publishes the production image to ECR after ci + docker pass.
+    # Only runs on push to main — PRs prove the image builds; they do
+    # not publish. Requires bootstrap to have been applied (ECR repo +
+    # OIDC role must exist). See infra/terraform/README.md.
+    name: push to ECR
+    needs: [ci, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write   # OIDC token exchange
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: gha-server-push-${{ github.run_id }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: ${{ steps.ecr-login.outputs.registry }}/onboarding-platform:${{ github.sha }}
+          # Reuse layers cached by the docker job that ran in parallel.
           cache-from: type=gha
           cache-to: type=gha,mode=max
