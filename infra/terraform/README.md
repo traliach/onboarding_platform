@@ -56,6 +56,9 @@ terraform apply tfplan
 
 `outputs.tf` exposes:
 
+- `project_name` — same as `var.project_name` (`onboarding-platform` by
+  default); used by `ansible/scripts/render-inventory.sh` when composing the
+  default ECR image URI.
 - `alb_dns_name` — public entrypoint; used by the `infra.yml`
   workflow's smoke test and (later) by a Route53 alias record.
 - `instance_ids` — role → EC2 id map; used by Ansible for SSM-based
@@ -65,7 +68,9 @@ terraform apply tfplan
 - `vpc_id` / `region` — echoed for downstream tooling.
 
 The Ansible inventory is generated from these outputs, never
-hand-edited (CLAUDE.md §5 "Ansible").
+hand-edited (CLAUDE.md §5 "Ansible"). After `terraform apply`, push the
+server image to ECR, run `../ansible/scripts/render-inventory.sh`, then
+`ansible-playbook ../ansible/playbooks/site.yml` — see `../ansible/README.md`.
 
 ## Destroy
 

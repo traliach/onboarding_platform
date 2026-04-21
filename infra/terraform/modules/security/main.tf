@@ -56,8 +56,16 @@ resource "aws_security_group" "app" {
 
 resource "aws_security_group" "worker" {
   name        = "${var.name_prefix}-worker-sg"
-  description = "Worker EC2 — no external ingress. Redis is localhost on this host."
+  description = "Worker EC2 — Redis from app SG only (BullMQ). Worker + Redis share this host."
   vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "Redis from app (BullMQ queue)"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app.id]
+  }
 
   egress {
     description = "Outbound (ECR, SSM, DB)"

@@ -1,3 +1,8 @@
+output "project_name" {
+  description = "Resource name prefix — same as var.project_name. Used by Ansible ECR image path."
+  value       = var.project_name
+}
+
 output "alb_dns_name" {
   description = "ALB public DNS name. Consumed by the Ansible smoke test and by Route53 when a domain is attached."
   value       = module.alb.alb_dns_name
