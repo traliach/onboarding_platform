@@ -38,14 +38,14 @@
 
 - name: Prometheus datasource
   ansible.builtin.template:
-    src: datasource.yml.j2
+    src: "{{ playbook_dir }}/../../monitoring/grafana/datasources.yml"
     dest: /etc/grafana/provisioning/datasources/prometheus.yml
     owner: grafana
     group: grafana
     mode: "0644"
   notify: Restart grafana-server
 
-- name: Dashboard provider (empty JSON dashboards ship in phase 4)
+- name: Dashboard provider
   ansible.builtin.copy:
     dest: /etc/grafana/provisioning/dashboards/default.yml
     owner: grafana
@@ -62,6 +62,24 @@
           editable: true
           options:
             path: /var/lib/grafana/dashboards
+  notify: Restart grafana-server
+
+- name: Fleet overview dashboard
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../monitoring/grafana/dashboards/fleet-overview.json"
+    dest: /var/lib/grafana/dashboards/fleet-overview.json
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: Restart grafana-server
+
+- name: Onboarding jobs dashboard
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../monitoring/grafana/dashboards/onboarding-jobs.json"
+    dest: /var/lib/grafana/dashboards/onboarding-jobs.json
+    owner: grafana
+    group: grafana
+    mode: "0644"
   notify: Restart grafana-server
 
 - name: Enable Grafana

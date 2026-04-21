@@ -1,0 +1,38 @@
+groups:
+  - name: onboarding_platform
+    rules:
+      - alert: EC2Down
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "EC2 instance {{ $labels.instance }} is down"
+          description: "node_exporter on {{ $labels.instance }} has been unreachable for more than 2 minutes"
+
+      - alert: HighMemoryUsage
+        expr: node_memory_MemAvailable_bytes{job="node"} < 100 * 1024 * 1024
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Less than 100 MB of memory available on {{ $labels.instance }}"
+
+      - alert: JobQueueDepth
+        expr: bullmq_pending_jobs_total > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job queue depth exceeds 50"
+          description: "BullMQ has {{ $value }} pending jobs — threshold is 50"
+
+      - alert: JobFailureRate
+        expr: increase(bullmq_failed_jobs_total[10m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job failure rate elevated"
+          description: "{{ $value }} jobs have failed in the last 10 minutes"

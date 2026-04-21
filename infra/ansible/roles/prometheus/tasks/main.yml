@@ -46,8 +46,17 @@
 
 - name: Prometheus config
   ansible.builtin.template:
-    src: prometheus.yml.j2
+    src: "{{ playbook_dir }}/../../monitoring/prometheus/prometheus.yml"
     dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+  notify: Restart prometheus
+
+- name: Alert rules
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../monitoring/prometheus/alerts.yml"
+    dest: /etc/prometheus/alerts.yml
     owner: prometheus
     group: prometheus
     mode: "0644"
