@@ -8,23 +8,15 @@ terraform {
     }
   }
 
-  # Remote state — CLAUDE.md §5 "Remote state".
-  #
-  # This backend MUST NOT be the first thing you init on a fresh clone.
-  # The bucket and table are created by `bootstrap/` (applied once per
-  # account, with local state). If you hit "bucket does not exist" on
-  # `terraform init`, the fix is to run bootstrap first — not to comment
-  # this block out. See ../../infra/terraform/README.md for the full
-  # order-of-operations.
-  #
-  # The bucket/table names must match the literals in
-  # `bootstrap/main.tf`. If either module changes a name, the other
-  # must update in the same PR.
+  # Remote state — CLAUDE.md §5.
+  # Bucket and DynamoDB table are pre-existing (created once via AWS CLI —
+  # see docs/runbook.md). The bucket is shared across projects; state is
+  # isolated by the key path. Never delete the lock table between deploys.
   backend "s3" {
-    bucket         = "onboarding-platform-tfstate"
-    key            = "terraform.tfstate"
+    bucket         = "achille-tf-state"
+    key            = "onboarding-platform/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "onboarding-platform-tf-locks"
+    dynamodb_table = "onboarding-platform-tf-lock"
     encrypt        = true
   }
 }

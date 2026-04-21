@@ -13,11 +13,9 @@
 #     on a lock is a worse signal than queuing).
 #
 # What this does NOT do:
-#   - Does not touch `infra/terraform/bootstrap/`. That module is
-#     applied once per AWS account, by hand, with local state (see
-#     ADR-007 and infra/terraform/README.md). Running bootstrap from
-#     CI would need the S3/DDB/OIDC resources to already exist, which
-#     is the chicken-and-egg this whole workflow avoids.
+#   - Does not create the S3 state bucket, DynamoDB lock table, or OIDC
+#     role. Those are pre-existing resources created once via AWS CLI
+#     (see docs/runbook.md). CI assumes they already exist.
 #   - Does not run `tfsec` / `checkov`. Security scanning is a
 #     separate PR and a separate decision; adding it quietly here
 #     would block on a first-run backlog of low-severity findings.
@@ -116,12 +114,6 @@ jobs:
 
       - name: Terraform validate
         run: terraform validate
-
-      - name: Terraform validate (bootstrap)
-        working-directory: infra/terraform/bootstrap
-        run: |
-          terraform init -backend=false
-          terraform validate
 
   plan:
     name: plan
