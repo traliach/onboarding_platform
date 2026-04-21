@@ -1,83 +1,62 @@
-# Master playbook — runs every role in the right order.
+---
+# Master playbook — dependency order:
+#   common (all) → db + worker (parallel in separate plays) → app → prometheus → grafana
 #
-# Invoke with:
-#   cd infra/ansible
-#   ansible-playbook playbooks/site.yml
+# Connection: SSM (amazon.aws.aws_ssm). No SSH. Controller needs:
+#   - AWS creds (profile or env) with ssm:StartSession on the fleet
+#   - ansible-galaxy collection install -r requirements.yml
 #
-# CI (infra.yml) runs this same command after `terraform apply`
-# succeeds. There is NO other entrypoint — no "run just the db
-# role" wrapper, no "skip common" shortcut. Idempotence makes
-# full-fleet runs cheap enough that selective runs are a
-# mis-optimisation.
-#
-# Ordering rationale:
-#   1. common runs on every host FIRST — it installs node_exporter,
-#      the SSM agent check, swap file, and timezone. Later roles
-#      assume these exist. Running it last would mean the db role
-#      configures postgres on a host that might OOM five minutes
-#      later because swap isn't provisioned.
-#   2. db runs before worker/app because they hold live connections
-#      to it at startup. If the app container starts before postgres
-#      is listening, the health check fails the ALB target group
-#      registration on first apply.
-#   3. worker runs before app because the worker is the Redis host;
-#      the app's BullMQ producer needs Redis reachable on port
-#      redis_port before it starts.
-#   4. prometheus runs after every scrape-target role so that its
-#      scrape_configs in monitoring/prometheus/ actually resolve to
-#      running node_exporters.
-#   5. grafana runs LAST because it provisions dashboards that query
-#      prometheus — if prometheus isn't up when the datasource is
-#      tested, grafana boots in a half-broken state.
+# Inventory: run ../scripts/render-inventory.sh after terraform apply, then
+# optionally ansible-vault-encrypt group_vars/all/vault.yml
 
-# ----------------------------------------------------------------
-# Phase 1: baseline on every host.
-# ----------------------------------------------------------------
-- name: Baseline configuration on every EC2
+- name: Common baseline on all EC2s
   hosts: all
   become: true
   gather_facts: true
   roles:
     - common
 
-# ----------------------------------------------------------------
-# Phase 2: database.
-# ----------------------------------------------------------------
-- name: Configure PostgreSQL host
-  hosts: role_db
+- name: PostgreSQL on db
+  hosts: db
   become: true
   roles:
     - db
 
-# ----------------------------------------------------------------
-# Phase 3: worker (Redis + BullMQ worker container).
-# ----------------------------------------------------------------
-- name: Configure worker host
-  hosts: role_worker
+- name: Redis + BullMQ worker on worker
+  hosts: worker
   become: true
   roles:
     - worker
 
-# ----------------------------------------------------------------
-# Phase 4: API.
-# ----------------------------------------------------------------
-- name: Configure app host
-  hosts: role_app
+- name: API on app
+  hosts: app
   become: true
+  pre_tasks:
+    - name: Wait for PostgreSQL
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['db'][0]]['private_ip'] }}"
+        port: 5432
+        timeout: 300
+      delegate_to: localhost
+
+    - name: Wait for Redis
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['worker'][0]]['private_ip'] }}"
+        port: 6379
+        timeout: 300
+      delegate_to: localhost
+
   roles:
     - app
 
-# ----------------------------------------------------------------
-# Phase 5: observability.
-# ----------------------------------------------------------------
-- name: Configure Prometheus host
-  hosts: role_prometheus
+- name: Prometheus
+  hosts: prometheus
   become: true
   roles:
     - prometheus
 
-- name: Configure Grafana host
-  hosts: role_grafana
+- name: Grafana
+  hosts: grafana
   become: true
   roles:
     - grafana

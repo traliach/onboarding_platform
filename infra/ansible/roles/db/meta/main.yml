@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: db
+  namespace: onboarding_platform
+  description: >-
+    PostgreSQL 16 on a t2.micro — install, tune for 1GB RAM (ADR-004),
+    provision the onboarding database role. Schema migrations run from
+    the API container on boot (server/src/db/migrate.ts).
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Amazon
+      versions:
+        - "2023"
+
+dependencies: []

@@ -1,0 +1,71 @@
+---
+- name: Grafana RPM repository
+  ansible.builtin.yum_repository:
+    name: grafana
+    description: Grafana OSS
+    baseurl: https://rpm.grafana.com
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: https://rpm.grafana.com/gpg.key
+    sslverify: true
+
+- name: Install Grafana
+  ansible.builtin.dnf:
+    name: grafana
+    state: present
+
+- name: Grafana sysconfig (admin password + bind all interfaces)
+  ansible.builtin.copy:
+    dest: /etc/sysconfig/grafana-server
+    mode: "0600"
+    content: |
+      GF_SECURITY_ADMIN_PASSWORD={{ onboarding_platform_grafana_admin_password }}
+      GF_SERVER_HTTP_ADDR=0.0.0.0
+  no_log: true
+  notify: Restart grafana-server
+
+- name: Provisioning directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: "0755"
+  loop:
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+    - /var/lib/grafana/dashboards
+
+- name: Prometheus datasource
+  ansible.builtin.template:
+    src: datasource.yml.j2
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: Restart grafana-server
+
+- name: Dashboard provider (empty JSON dashboards ship in phase 4)
+  ansible.builtin.copy:
+    dest: /etc/grafana/provisioning/dashboards/default.yml
+    owner: grafana
+    group: grafana
+    mode: "0644"
+    content: |
+      apiVersion: 1
+      providers:
+        - name: Default
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards
+  notify: Restart grafana-server
+
+- name: Enable Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    enabled: true
+    state: started

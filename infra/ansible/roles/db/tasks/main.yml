@@ -1,0 +1,85 @@
+---
+- name: Install PostgreSQL 16 server + psycopg2 (Ansible modules)
+  ansible.builtin.dnf:
+    name:
+      - postgresql16-server
+      - python3-psycopg2
+    state: present
+
+- name: Check if PostgreSQL is initialised
+  ansible.builtin.stat:
+    path: /var/lib/pgsql/data/PG_VERSION
+  register: pgdata
+
+- name: Initialise database cluster
+  when: not pgdata.stat.exists
+  ansible.builtin.command: /usr/bin/postgresql-setup --initdb
+  args:
+    creates: /var/lib/pgsql/data/PG_VERSION
+
+- name: PostgreSQL tuning — listen on all interfaces (SG is the boundary)
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: '^#?listen_addresses\s*='
+    line: "listen_addresses = '*'"
+    backup: true
+  notify: Restart postgresql
+
+- name: PostgreSQL tuning — memory
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: '^#?shared_buffers\s*='
+    line: "shared_buffers = {{ postgres_shared_buffers }}"
+  notify: Restart postgresql
+
+- name: PostgreSQL tuning — work_mem
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: '^#?work_mem\s*='
+    line: "work_mem = {{ postgres_work_mem }}"
+  notify: Restart postgresql
+
+- name: PostgreSQL tuning — max_connections
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: '^#?max_connections\s*='
+    line: "max_connections = {{ postgres_max_connections }}"
+  notify: Restart postgresql
+
+- name: PostgreSQL tuning — effective_cache_size
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: '^#?effective_cache_size\s*='
+    line: "effective_cache_size = {{ postgres_effective_cache_size }}"
+  notify: Restart postgresql
+
+- name: Allow private subnet in pg_hba (scram-sha-256)
+  ansible.builtin.lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    line: "host all all {{ postgres_vpc_private_cidr }} scram-sha-256"
+    state: present
+  notify: Restart postgresql
+
+- name: Apply PostgreSQL config before first boot
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start PostgreSQL
+  ansible.builtin.systemd:
+    name: postgresql
+    enabled: true
+    state: started
+
+- name: Create database role
+  community.postgresql.postgresql_user:
+    name: "{{ onboarding_platform_db_user }}"
+    password: "{{ onboarding_platform_db_password }}"
+    state: present
+  become_user: postgres
+  no_log: true
+
+- name: Create application database
+  community.postgresql.postgresql_db:
+    name: "{{ onboarding_platform_db_name }}"
+    owner: "{{ onboarding_platform_db_user }}"
+    state: present
+  become_user: postgres

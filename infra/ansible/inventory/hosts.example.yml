@@ -1,0 +1,38 @@
+# Copy to hosts.yml (gitignored) or run scripts/render-inventory.sh after
+# `terraform apply` in infra/terraform/.
+#
+# ansible_host MUST be the EC2 instance id for SSM. private_ip is used for
+# wait_for, DATABASE_URL, REDIS_URL, and Prometheus scrape targets.
+
+all:
+  vars:
+    ansible_connection: amazon.aws.aws_ssm
+    ansible_aws_ssm_region: us-east-1
+    ansible_user: ec2-user
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    app:
+      hosts:
+        onboarding-app:
+          ansible_host: i-REPLACE_APP_INSTANCE_ID
+          private_ip: 10.0.11.10
+    worker:
+      hosts:
+        onboarding-worker:
+          ansible_host: i-REPLACE_WORKER_INSTANCE_ID
+          private_ip: 10.0.11.11
+    db:
+      hosts:
+        onboarding-db:
+          ansible_host: i-REPLACE_DB_INSTANCE_ID
+          private_ip: 10.0.11.12
+    prometheus:
+      hosts:
+        onboarding-prometheus:
+          ansible_host: i-REPLACE_PROMETHEUS_INSTANCE_ID
+          private_ip: 10.0.11.13
+    grafana:
+      hosts:
+        onboarding-grafana:
+          ansible_host: i-REPLACE_GRAFANA_INSTANCE_ID
+          private_ip: 10.0.11.14

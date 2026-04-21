@@ -59,6 +59,7 @@ cookies.txt
 # Ansible — decrypted vault, local password files, installed collections,
 # inventory cache, virtualenv. The .example files ARE committed.
 infra/ansible/group_vars/all/vault.yml
+infra/ansible/inventory/hosts.yml
 infra/ansible/.vault-pass
 infra/ansible/collections/
 infra/ansible/.venv/

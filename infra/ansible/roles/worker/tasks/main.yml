@@ -1,0 +1,62 @@
+---
+- name: Install Docker, Redis, AWS CLI (ECR login)
+  ansible.builtin.dnf:
+    name:
+      - docker
+      - redis6
+      - awscli
+    state: present
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Redis — listen on all interfaces (app SG is the only ingress to 6379)
+  ansible.builtin.lineinfile:
+    path: /etc/redis6/redis6.conf
+    regexp: '^bind '
+    line: bind 0.0.0.0 -::1
+  notify: Restart redis6
+
+- name: Redis — disable protected mode (VPC + SG boundary; no public IP on worker)
+  ansible.builtin.lineinfile:
+    path: /etc/redis6/redis6.conf
+    regexp: '^protected-mode '
+    line: protected-mode no
+  notify: Restart redis6
+
+- name: Enable and start Redis
+  ansible.builtin.systemd:
+    name: redis6
+    enabled: true
+    state: started
+
+- name: Application config directory
+  ansible.builtin.file:
+    path: /etc/onboarding-platform
+    state: directory
+    mode: "0700"
+
+- name: Worker environment file
+  ansible.builtin.template:
+    src: worker.env.j2
+    dest: /etc/onboarding-platform/worker.env
+    mode: "0600"
+  no_log: true
+
+- name: Worker systemd unit
+  ansible.builtin.template:
+    src: onboarding-worker.service.j2
+    dest: /etc/systemd/system/onboarding-worker.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart onboarding-worker
+
+- name: Enable worker service
+  ansible.builtin.systemd:
+    name: onboarding-worker
+    enabled: true
+    state: started

@@ -1,0 +1,86 @@
+---
+- name: Prometheus system user
+  ansible.builtin.user:
+    name: prometheus
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+
+- name: Directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+  loop:
+    - /opt/prometheus
+    - /var/lib/prometheus
+    - /etc/prometheus
+
+- name: Download Prometheus
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    mode: "0644"
+
+- name: Unpack Prometheus
+  ansible.builtin.unarchive:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/prometheus"
+
+- name: Install prometheus and promtool binaries
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "/opt/prometheus/{{ item }}"
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+    remote_src: true
+  loop:
+    - prometheus
+    - promtool
+  notify: Restart prometheus
+
+- name: Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+  notify: Restart prometheus
+
+- name: Prometheus systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Prometheus
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      ExecStart=/opt/prometheus/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --web.listen-address=0.0.0.0:9090
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - Reload systemd
+    - Restart prometheus
+
+- name: Enable Prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    enabled: true
+    state: started

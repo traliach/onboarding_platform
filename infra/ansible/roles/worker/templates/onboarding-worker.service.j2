@@ -1,0 +1,19 @@
+[Unit]
+Description=onboarding_platform worker (Docker, host network)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+TimeoutStartSec=0
+Restart=always
+RestartSec=5
+Environment=AWS_DEFAULT_REGION={{ aws_region }}
+ExecStartPre=-/usr/bin/docker rm -f onboarding-worker
+ExecStartPre=/usr/bin/bash -c '/usr/bin/aws ecr get-login-password --region {{ aws_region }} | /usr/bin/docker login --username AWS --password-stdin {{ ecr_registry }}'
+ExecStart=/usr/bin/docker run --name onboarding-worker --rm --pull always --network host --env-file /etc/onboarding-platform/worker.env {{ onboarding_platform_container_image }} node dist/server/src/index.js
+ExecStop=/usr/bin/docker stop onboarding-worker
+
+[Install]
+WantedBy=multi-user.target

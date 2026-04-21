@@ -1,68 +1,21 @@
-# Variables shared across every host in the fleet.
-#
-# Rules of what goes here:
-#   - No secrets. Ever. Secrets go in vault.yml (encrypted).
-#   - No per-host overrides. If a value differs per host, put it in
-#     host_vars/<hostname>/ or group_vars/<role_group>/.
-#   - Version pins go here so "upgrade node_exporter" is a one-line
-#     change reviewable in `git diff`.
-#
-# CLAUDE.md §5 naming convention: every user-visible name uses the
-# project prefix. No company/client/person identifiers appear here.
+---
+# Non-secret defaults. Secrets live in vault.yml (gitignored — copy from
+# vault.example.yml and `ansible-vault encrypt`).
 
-# Project identity — mirrors the Terraform name_prefix variable.
-# Ansible uses it to build S3 bucket names, systemd unit names, and
-# log prefixes consistently with what Terraform created.
-project_name: onboarding-platform
-aws_region: us-east-1
+onboarding_platform_db_name: onboarding
+onboarding_platform_db_user: onboarding
 
-# ---------------------------------------------------------------
-# Versions — bumped in lockstep with their upstream counterparts.
-# ---------------------------------------------------------------
-
-# Matches server/package.json `engines.node` (CLAUDE.md §4). When
-# this bumps, bump there and in server/Dockerfile at the same time.
-node_major_version: 22
-
-# PostgreSQL major. Amazon Linux 2023 ships a postgresql16-server
-# package natively; using the distro package avoids a third-party
-# repo and its GPG-key lifecycle. If we ever need 17+, switch to the
-# PGDG repo and bump here.
-postgresql_version: 16
-
-# node_exporter is pinned — Prometheus scrape compatibility is
-# stable across minor versions but we don't want a silent jump.
+# Node exporter — pinned version (amd64 AL2023 fleet)
 node_exporter_version: "1.8.2"
-node_exporter_port: 9100
 
-# Prometheus server itself — deployed only on the prometheus host.
-prometheus_version: "2.54.1"
-prometheus_port: 9090
+# Prometheus — pinned binary version
+prometheus_version: "2.53.1"
 
-# Grafana — OSS edition, never Enterprise.
-grafana_version: "11.2.0"
-grafana_port: 3000
+# PostgreSQL tuning — ADR-004 / CLAUDE.md §6 (1 GiB RAM)
+postgres_shared_buffers: "128MB"
+postgres_work_mem: "4MB"
+postgres_max_connections: 20
+postgres_effective_cache_size: "256MB"
 
-# Redis — managed via the system package on the worker host.
-redis_port: 6379
-
-# ---------------------------------------------------------------
-# Application config (non-secret).
-# ---------------------------------------------------------------
-
-# Port the API listens on inside the app container. The ALB target
-# group targets this port; changing it here requires a Terraform
-# change to the alb module in the same PR.
-app_port: 4000
-
-# PostgreSQL database + role names. Passwords come from vault.yml.
-postgresql_db_name: onboarding_platform
-postgresql_db_user: onboarding_platform
-
-# ---------------------------------------------------------------
-# Paths on the target hosts.
-# ---------------------------------------------------------------
-
-# Everything the platform writes goes under /opt/onboarding-platform.
-# A single root makes backup scripts and `du -sh` output predictable.
-platform_root: "/opt/{{ project_name }}"
+# Private subnet CIDR for pg_hba — must match infra/terraform default private_subnet_cidr
+postgres_vpc_private_cidr: "10.0.11.0/24"

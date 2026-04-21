@@ -1,110 +1,84 @@
 # Ansible — `infra/ansible/`
 
-Configures the 5-EC2 fleet after Terraform has provisioned it.
+Configures the five-EC2 fleet **after** Terraform has created it. Connection is
+**SSM Session Manager** only — port 22 is closed on every instance (CLAUDE.md §5).
 
-## Layout
+## Prerequisites (controller laptop or CI runner)
 
-```
-infra/ansible/
-├── ansible.cfg                # project-local defaults
-├── requirements.yml           # Galaxy collections
-├── requirements.txt           # Python deps (ansible-core, boto3)
-├── inventory/
-│   └── aws_ec2.yml            # dynamic inventory — tag:Project filter
-├── group_vars/all/
-│   ├── main.yml               # non-secret shared vars
-│   ├── vault.yml              # encrypted secrets (gitignored — see below)
-│   └── vault.yml.example      # structure reference, committed
-├── playbooks/
-│   └── site.yml               # master playbook — runs every role in order
-└── roles/
-    ├── common/                # baseline on every EC2
-    ├── db/                    # PostgreSQL + tuning
-    ├── worker/                # Redis + BullMQ worker container
-    ├── app/                   # API container behind the ALB
-    ├── prometheus/            # Prometheus server
-    └── grafana/               # Grafana + provisioned dashboards
-```
+- Ansible ≥ 2.15
+- Python 3 + `pip` (for `boto3` if not already installed)
+- AWS credentials with `ssm:StartSession` on the fleet (named profile recommended)
+- Collections: `ansible-galaxy collection install -r requirements.yml`
+- `jq`, `terraform`, and `aws` CLI for `scripts/render-inventory.sh`
 
-## Prerequisites
-
-- Terraform applied (bootstrap **and** root module), otherwise the
-  dynamic inventory returns zero hosts.
-- AWS CLI v2 on PATH (the `aws_ssm` connection plugin shells out to
-  `aws ssm start-session`).
-- `AWS_PROFILE` and `AWS_REGION` set in the shell. No static keys in
-  env files (CLAUDE.md §10).
-- An S3 bucket named `onboarding-platform-ansible-ssm` exists in the
-  same region. It is created by the root Terraform module — not by
-  Ansible, and not by bootstrap. Without it every `copy`/`template`
-  task fails at upload time.
-- Python 3.10+ and a virtualenv for ansible-core.
-
-## First-time setup
+## One-time secrets
 
 ```bash
 cd infra/ansible
-
-# 1. Python + Ansible
-python -m venv .venv
-source .venv/bin/activate          # Git Bash on Windows: source .venv/Scripts/activate
-pip install -r requirements.txt
-
-# 2. Galaxy collections (amazon.aws, community.aws, community.postgresql, ...)
-ansible-galaxy collection install -r requirements.yml
-
-# 3. Create your local vault
 cp group_vars/all/vault.yml.example group_vars/all/vault.yml
-# Edit group_vars/all/vault.yml — replace every CHANGE_ME value.
 ansible-vault encrypt group_vars/all/vault.yml
-# Save the vault password to .vault-pass (gitignored) OR set
-# ANSIBLE_VAULT_PASSWORD_FILE in the shell.
+# store the vault password outside the repo
 ```
 
-## Running a full converge
+`vault.yml` is gitignored. Never commit the decrypted file.
+
+Use a **URL-safe** database password — it is embedded in `DATABASE_URL` inside
+the generated env files.
+
+## Inventory
+
+After every `terraform apply` that changes instance IDs or private IPs:
 
 ```bash
-ansible-playbook playbooks/site.yml
+cd infra/ansible
+./scripts/render-inventory.sh
 ```
 
-Site.yml is the only supported entrypoint. Idempotence keeps
-full-fleet runs cheap (~2 minutes once everything is installed);
-selective runs via tags are explicitly not supported — the role
-ordering in site.yml encodes dependencies that tag-based runs break.
+This writes `inventory/hosts.yml` (gitignored) with `ansible_host` = instance id
+for SSM, `private_ip` for Postgres/Redis URLs and Prometheus targets, and default
+`onboarding_platform_container_image` pointing at
+`$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$PROJECT:latest`.
 
-## Running against one host
+Edit the image tag after CI pushes a real digest.
 
-For debugging only. Scope with `--limit`, not with tags:
+## Container image
+
+Ansible does **not** build the image — it pulls from ECR. Push an image built
+from repo root (`docker build -f server/Dockerfile .`) before the `app` and
+`worker` plays succeed.
+
+## Run
+
+From `infra/ansible`:
 
 ```bash
-ansible-playbook playbooks/site.yml --limit role_db
+export AWS_PROFILE=your-profile   # or rely on instance profile on a jump box
+ansible-playbook playbooks/site.yml --vault-password-file ~/.vault/onboarding
 ```
 
-## Verifying the inventory sees your fleet
+## Role map
 
-```bash
-ansible-inventory --list | jq '.role_app, .role_db, .role_worker, .role_prometheus, .role_grafana'
-```
+| Role        | Hosts       | Purpose |
+|-------------|-------------|---------|
+| `common`    | all         | Python for Ansible, swap, `node_exporter` :9100 |
+| `db`        | db          | PostgreSQL 16 + ADR-004 tuning + app DB user |
+| `worker`    | worker      | Docker, Redis 6, BullMQ worker container (host network) |
+| `app`       | app         | Docker, API container on **:3000** (matches ALB target group) |
+| `prometheus`| prometheus  | Prometheus binary, scrapes all `:9100` targets |
+| `grafana`   | grafana     | Grafana OSS + Prometheus datasource (dashboard JSON = phase 4) |
 
-Each group should contain exactly one host named
-`onboarding-platform-<role>`. If any group is empty, either
-Terraform hasn't run or the `Role` tag in the compute module
-drifted from what `aws_ec2.yml` expects.
+## Terraform coordination
 
-## CI behaviour
+- **Redis ingress:** the worker security group allows **6379 from the app SG**
+  so the API can enqueue BullMQ jobs. Applied in `infra/terraform/modules/security`.
+- **`project_name` output:** used by `render-inventory.sh` for the default ECR
+  repository name (`onboarding-platform` by default).
 
-`.github/workflows/infra.yml` runs `ansible-playbook playbooks/site.yml`
-as the final step of the apply job, after Terraform has reached a
-stable state. CI writes the vault password from the
-`ANSIBLE_VAULT_PASSWORD` repo secret to a temp file and exports
-`ANSIBLE_VAULT_PASSWORD_FILE` before invoking ansible-playbook.
+## Troubleshooting
 
-## What this does NOT manage
-
-- **Bootstrap resources** (S3 state bucket, DynamoDB lock, OIDC role)
-  — owned by Terraform bootstrap, applied once per AWS account.
-- **The fleet itself** (EC2, ALB, VPC, SGs, VPC endpoints) — owned
-  by Terraform root module. Ansible configures, Terraform provisions.
-- **Application code** — the app and worker roles pull a container
-  image from ECR built by `.github/workflows/server.yml`. Code
-  changes do not require an Ansible run; a new image tag does.
+- **`community.postgresql` errors** — ensure `python3-psycopg2` installed on the
+  db host (the `db` role installs it).
+- **Redis service name** — Amazon Linux 2023 uses `redis6.service` and
+  `/etc/redis6/redis6.conf`.
+- **PostgreSQL service name** — if `postgresql` fails, try `postgresql-16` and
+  patch the role (AMI drift).

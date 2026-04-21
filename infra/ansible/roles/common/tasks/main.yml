@@ -1,22 +1,86 @@
 ---
-# Entry point for the common role. Keep this file boring —
-# implementation lives in the imported files so each file has a
-# single responsibility and a git diff of the role reads as
-# "packages changed" or "swap changed" rather than "common changed".
+- name: Ensure Python + SELinux bindings for Ansible over SSM
+  ansible.builtin.dnf:
+    name:
+      - python3
+      - python3-libselinux
+    state: present
 
-- name: Set system timezone to UTC
-  community.general.timezone:
-    name: UTC
-  # Rationale: every log line, every Prometheus timestamp, every
-  # migration started_at lives in UTC already. A mismatched
-  # /etc/localtime produces confusing dual-timestamp log lines when
-  # grep-ing CloudTrail against journalctl.
+- name: Check for swap file
+  ansible.builtin.stat:
+    path: /swapfile
+  register: onboarding_swapfile
 
-- name: Install baseline packages
-  ansible.builtin.import_tasks: packages.yml
+- name: Allocate 2 GiB swap file (t2.micro safety net)
+  when: not onboarding_swapfile.stat.exists
+  block:
+    - name: fallocate swap
+      ansible.builtin.command: fallocate -l 2G /swapfile
+      changed_when: true
 
-- name: Configure swap file
-  ansible.builtin.import_tasks: swap.yml
+    - name: swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
 
-- name: Install node_exporter
-  ansible.builtin.import_tasks: node_exporter.yml
+    - name: mkswap
+      ansible.builtin.command: mkswap /swapfile
+      changed_when: true
+
+    - name: swapon
+      ansible.builtin.command: swapon /swapfile
+      changed_when: true
+
+    - name: persist swap in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: /swapfile none swap sw 0 0
+        state: present
+
+- name: Download node_exporter archive
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    mode: "0644"
+
+- name: Unpack node_exporter
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+
+- name: Install node_exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: "0755"
+    remote_src: true
+  notify: Restart node_exporter
+
+- name: node_exporter systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=nobody
+      ExecStart=/usr/local/bin/node_exporter --web.listen-address=:9100
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+
+- name: Enable node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
