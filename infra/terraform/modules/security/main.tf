@@ -32,7 +32,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "app" {
   name        = "${var.name_prefix}-app-sg"
-  description = "API EC2 — accepts traffic ONLY from ALB SG (CLAUDE.md section 9)."
+  description = "API EC2 — API traffic from ALB, node_exporter scrape from monitoring."
   vpc_id      = var.vpc_id
 
   ingress {
@@ -41,6 +41,14 @@ resource "aws_security_group" "app" {
     to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "node_exporter from Prometheus"
+    from_port       = 9100
+    to_port         = 9100
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
   }
 
   egress {
@@ -56,7 +64,7 @@ resource "aws_security_group" "app" {
 
 resource "aws_security_group" "worker" {
   name        = "${var.name_prefix}-worker-sg"
-  description = "Worker EC2 — Redis from app SG only (BullMQ). Worker + Redis share this host."
+  description = "Worker EC2 — Redis from app SG, node_exporter scrape from monitoring."
   vpc_id      = var.vpc_id
 
   ingress {
@@ -65,6 +73,14 @@ resource "aws_security_group" "worker" {
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.app.id]
+  }
+
+  ingress {
+    description     = "node_exporter from Prometheus"
+    from_port       = 9100
+    to_port         = 9100
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
   }
 
   egress {
@@ -80,7 +96,7 @@ resource "aws_security_group" "worker" {
 
 resource "aws_security_group" "db" {
   name        = "${var.name_prefix}-db-sg"
-  description = "PostgreSQL EC2 — accepts 5432 ONLY from app and worker SGs (CLAUDE.md section 9 + 17)."
+  description = "PostgreSQL EC2 — 5432 from app/worker, node_exporter scrape from monitoring."
   vpc_id      = var.vpc_id
 
   ingress {
@@ -97,6 +113,14 @@ resource "aws_security_group" "db" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.worker.id]
+  }
+
+  ingress {
+    description     = "node_exporter from Prometheus"
+    from_port       = 9100
+    to_port         = 9100
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
   }
 
   egress {
