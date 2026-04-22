@@ -63,12 +63,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js (lts/*)
         uses: actions/setup-node@v4
         with:
           # Matches client/package.json `engines.node` and the Vercel
           # runtime. Bumping here means bumping both places in lockstep.
-          node-version: "22"
+          node-version: "lts/*"
           # Cache key is the lockfile in client/. The default `npm`
           # cache strategy hashes package-lock.json for us.
           cache: npm

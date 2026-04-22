@@ -72,7 +72,7 @@ jobs:
           # Matches server/package.json `engines.node` and the Alpine
           # base image in server/Dockerfile (node:22-alpine). Bumping
           # here means bumping both in lockstep.
-          node-version: "22"
+          node-version: "lts/*"
           cache: npm
           cache-dependency-path: server/package-lock.json
 

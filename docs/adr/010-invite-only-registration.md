@@ -1,4 +1,4 @@
-# ADR-009: Invite-only registration
+# ADR-010: Invite-only registration
 
 ## Status
 Accepted
