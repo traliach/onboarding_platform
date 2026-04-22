@@ -50,7 +50,7 @@ export function AnalyticsView() {
 
   if (state.status === 'loading') {
     return (
-      <div className="card p-8 text-center text-sm text-slate-500">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-8 text-center text-sm text-slate-500">
         Loading analytics…
       </div>
     );
@@ -58,11 +58,11 @@ export function AnalyticsView() {
 
   if (state.status === 'error') {
     return (
-      <div className="card p-6 text-center">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6 text-center">
         <p className="text-sm text-red-600">{state.message}</p>
         <button
           type="button"
-          className="btn-secondary mt-3"
+          className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
           onClick={() => setRefreshKey((k) => k + 1)}
         >
           Retry
@@ -78,7 +78,7 @@ export function AnalyticsView() {
       <div className="flex items-center justify-end">
         <button
           type="button"
-          className="btn-secondary"
+          className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => setRefreshKey((k) => k + 1)}
         >
           Refresh
@@ -109,7 +109,7 @@ export function AnalyticsView() {
 
 function KpiCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="card p-4">
+    <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-4">
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </div>
@@ -125,7 +125,7 @@ function StepDurations({
 }) {
   if (rows.length === 0) {
     return (
-      <section className="card p-6">
+      <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
         <h3 className="text-base font-semibold text-slate-900">
           Average duration per step
         </h3>
@@ -142,7 +142,7 @@ function StepDurations({
   const max = Math.max(...rows.map((r) => r.avg_seconds), 1);
 
   return (
-    <section className="card p-6">
+    <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
       <h3 className="mb-4 text-base font-semibold text-slate-900">
         Average duration per step
       </h3>
@@ -178,7 +178,7 @@ function StepFailures({
   rows: Analytics['step_failures'];
 }) {
   return (
-    <section className="card p-6">
+    <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
       <h3 className="mb-4 text-base font-semibold text-slate-900">
         Failure rate by step
       </h3>

@@ -18,14 +18,13 @@ Operational reference for the `onboarding_platform` fleet.
 This sequence runs once per AWS account. After it completes, the CI/CD
 pipeline (`infra.yml`) handles all subsequent deploys.
 
-**Step 1 — Bootstrap remote state and OIDC role**
+**Step 1 — Confirm pre-existing AWS resources**
 
-```bash
-cd infra/terraform/bootstrap
-terraform init
-terraform apply
-# Outputs: bucket name, lock table name, OIDC role ARN
-```
+The S3 state bucket (`achille-tf-state`), DynamoDB lock table
+(`onboarding-platform-tf-lock`), ECR repository (`onboarding-platform`), and
+OIDC role (`onboarding-platform-github-actions`) are created once per AWS
+account via AWS CLI — not by Terraform. They must exist before running
+`terraform init`. See `docs/cost.md` for the one-time CLI commands.
 
 **Step 2 — Set GitHub repo secrets**
 
@@ -64,11 +63,26 @@ docker push "${ECR}/onboarding-platform:${SHA}"
 **Step 5 — Create and encrypt the Ansible vault**
 
 ```bash
-cp infra/ansible/group_vars/all/vault.example.yml \
+cp infra/ansible/group_vars/all/vault.yml.example \
    infra/ansible/group_vars/all/vault.yml
-# Edit vault.yml — fill in all onboarding_platform_* values
+```
+
+Edit `vault.yml` — replace every `CHANGE_ME_BEFORE_ENCRYPTING` value:
+
+| Key | How to generate |
+|-----|-----------------|
+| `onboarding_platform_db_password` | `openssl rand -base64 24` |
+| `onboarding_platform_jwt_secret` | `openssl rand -base64 48` (must be ≥ 32 chars) |
+| `onboarding_platform_grafana_admin_password` | Choose a strong password |
+
+Encrypt (the vault password becomes `ANSIBLE_VAULT_PASSWORD` in GitHub):
+
+```bash
 ansible-vault encrypt infra/ansible/group_vars/all/vault.yml
 ```
+
+`vault.yml` is gitignored — never commit the decrypted or encrypted file.
+The committed deliverable is `vault.yml.example` with placeholder values.
 
 **Step 6 — Render inventory and run Ansible**
 

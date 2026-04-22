@@ -51,7 +51,7 @@ surface, and the infrastructure story, not the integrations themselves.
 | Ansible | **Complete.** Six idempotent roles (common, db, worker, app, prometheus, grafana) run in order by a single master playbook over SSM. |
 | Monitoring | **Complete.** `monitoring/` holds Prometheus scrape config + 4 alert rules + 2 provisioned Grafana dashboards. Ansible deploys from the repo — nothing is hand-configured on the EC2. |
 | CI/CD | **Complete.** Three path-scoped workflows. `server.yml` builds + pushes to ECR on main. `infra.yml` runs `terraform apply` + Ansible + ALB smoke test on merge. |
-| Docs | **Complete.** 8 ADRs, `cost.md`, `architecture.md`, `runbook.md`. |
+| Docs | **Complete.** 10 ADRs, `cost.md`, `architecture.md`, `runbook.md`. |
 
 Built commit-by-commit with plain-English messages — `git log --oneline` is
 the change history.
@@ -212,7 +212,7 @@ infra/
 monitoring/     Prometheus config + alert rules + Grafana dashboard JSON
 scripts/        render-inventory.sh — Terraform outputs → Ansible hosts.yml
 docs/
-  adr/          001–008 Architecture Decision Records
+  adr/          001–010 Architecture Decision Records
   architecture.md  tier diagram, SG matrix, data flow
   runbook.md       deploy, teardown, SSM shell, Ansible per-host
   cost.md          full $47/month breakdown

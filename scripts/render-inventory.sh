@@ -34,13 +34,22 @@ grafana_ip=$(echo   "$OUTPUTS" | jq -r '.instance_private_ips.value.grafana')
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 
-# Image tag to deploy. server.yml pushes two tags on every merge to main:
-#   - Versioned: DATE-SHORTSHA-MSG  (for identification and rollback)
-#   - Stable:    main               (always points at the latest good build)
-# infra.yml uses `main` so Ansible always pulls the current good image
-# without needing to pass the versioned tag across workflow boundaries.
+# Image tag to deploy. server.yml pushes one traceable tag per merge to main
+# (DATE-SHORTSHA-MSG format; no mutable :main or :latest alias).
+# When DEPLOY_IMAGE_TAG is not set, query ECR for the most recently pushed tag.
 # Override locally: export DEPLOY_IMAGE_TAG=20260420-a3f9c2b-add-jwt-auth
-IMAGE_TAG="${DEPLOY_IMAGE_TAG:-main}"
+IMAGE_TAG="${DEPLOY_IMAGE_TAG:-}"
+if [[ -z "${IMAGE_TAG}" ]]; then
+  IMAGE_TAG=$(aws ecr describe-images \
+    --repository-name "${PROJECT}" \
+    --region "${REGION}" \
+    --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags[0]' \
+    --output text 2>/dev/null || true)
+  if [[ -z "${IMAGE_TAG}" || "${IMAGE_TAG}" == "None" ]]; then
+    echo "error: no images found in ECR repository ${PROJECT}. Push an image first." >&2
+    exit 1
+  fi
+fi
 CONTAINER_IMAGE="${ECR_REGISTRY}/${PROJECT}:${IMAGE_TAG}"
 
 mkdir -p "$(dirname "$OUT")"

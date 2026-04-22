@@ -71,13 +71,12 @@ export function ClientList() {
     setRefreshKey((k) => k + 1);
   }
 
-  // Filtering is pure derivation — memoised against the raw rows plus
+  // Filtering is pure derivation — memoised against the state plus
   // the two inputs so typing in the search box doesn't re-walk the
   // array on every unrelated render.
-  const allRows = state.status === 'ready' ? state.rows : [];
   const filteredRows = useMemo(
-    () => applyFilters(allRows, filter, search),
-    [allRows, filter, search],
+    () => applyFilters(state.status === 'ready' ? state.rows : [], filter, search),
+    [state, filter, search],
   );
 
   return (
@@ -101,7 +100,7 @@ export function ClientList() {
         </p>
         <button
           type="button"
-          className="btn-primary"
+          className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => setFormOpen(true)}
         >
           New client
@@ -109,18 +108,18 @@ export function ClientList() {
       </div>
 
       {state.status === 'loading' && (
-        <div className="card p-8 text-center text-sm text-slate-500">
+        <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-8 text-center text-sm text-slate-500">
           Loading clients…
         </div>
       )}
 
       {state.status === 'error' && (
-        <div className="card p-6 text-center">
+        <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6 text-center">
           <p className="text-sm text-red-600">{state.message}</p>
           <button
             type="button"
             onClick={() => setRefreshKey((k) => k + 1)}
-            className="btn-secondary mt-3"
+            className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
           >
             Retry
           </button>
@@ -134,7 +133,7 @@ export function ClientList() {
       {state.status === 'ready' &&
         state.rows.length > 0 &&
         filteredRows.length === 0 && (
-          <div className="card p-8 text-center text-sm text-slate-500">
+          <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-8 text-center text-sm text-slate-500">
             No clients match this filter.
           </div>
         )}
@@ -368,12 +367,12 @@ function FilterTab({
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="card p-10 text-center">
+    <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-10 text-center">
       <h3 className="text-base font-semibold text-slate-900">No clients yet</h3>
       <p className="mt-1 text-sm text-slate-500">
         Create your first client to kick off a provisioning run.
       </p>
-      <button type="button" className="btn-primary mt-4" onClick={onCreate}>
+      <button type="button" className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4" onClick={onCreate}>
         New client
       </button>
     </div>
@@ -382,7 +381,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 
 function ClientsTable({ rows }: { rows: ClientListEntry[] }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50">
           <tr>

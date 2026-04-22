@@ -40,6 +40,7 @@ export type JobProcessor = (job: BullJob<JobPayload>) => Promise<void>;
 
 export interface JobQueue {
   enqueueJob(jobId: string): Promise<void>;
+  getWaitingCount(): Promise<number>;
   close(): Promise<void>;
 }
 
@@ -77,6 +78,9 @@ export function createQueue(
         },
       );
       logger.info('job enqueued', { job_id: jobId, queue: config.queueName });
+    },
+    getWaitingCount(): Promise<number> {
+      return queue.getWaitingCount();
     },
     async close(): Promise<void> {
       await queue.close();

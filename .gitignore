@@ -52,6 +52,7 @@ CLAUDE.md
 # working notes, not project artifacts.
 prompt.MD
 docs/Onboarding platform build story.MD
+docs/deploy.md
 
 # Transient curl / dev artifacts
 cookies.txt

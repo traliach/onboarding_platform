@@ -35,11 +35,11 @@ cd infra/ansible
 ```
 
 This writes `inventory/hosts.yml` (gitignored) with `ansible_host` = instance id
-for SSM, `private_ip` for Postgres/Redis URLs and Prometheus targets, and default
-`onboarding_platform_container_image` pointing at
-`$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$PROJECT:latest`.
+for SSM, `private_ip` for Postgres/Redis URLs and Prometheus targets, and
+`onboarding_platform_container_image` set to the most recently pushed ECR tag
+(DATE-SHORTSHA-MSG format, resolved via `aws ecr describe-images`).
 
-Edit the image tag after CI pushes a real digest.
+Override the tag by setting `DEPLOY_IMAGE_TAG` before running the script.
 
 ## Container image
 

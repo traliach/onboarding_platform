@@ -72,7 +72,7 @@ function ClientPageInner({ id }: { id: string }) {
 
   if (staticState.kind === 'loading') {
     return (
-      <div className="card p-8 text-center text-sm text-slate-500">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-8 text-center text-sm text-slate-500">
         Loading client…
       </div>
     );
@@ -80,11 +80,11 @@ function ClientPageInner({ id }: { id: string }) {
 
   if (staticState.kind === 'error' || staticState.detail === undefined) {
     return (
-      <div className="card p-6 text-center">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6 text-center">
         <p className="text-sm text-red-600">
           {staticState.message ?? 'Client not found.'}
         </p>
-        <Link to="/" className="btn-secondary mt-3 inline-block">
+        <Link to="/" className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mt-3 inline-block">
           Back to dashboard
         </Link>
       </div>
@@ -102,7 +102,7 @@ function ClientPageLoaded({ detail }: { detail: ClientDetail }) {
       <Header client={client} />
 
       {job === null ? (
-        <div className="card p-6 text-sm text-slate-500">
+        <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6 text-sm text-slate-500">
           No provisioning job attached to this client.
         </div>
       ) : (
@@ -164,7 +164,7 @@ function JobPanel({
   const isLive = jobStatus === 'pending' || jobStatus === 'in_progress';
 
   return (
-    <section className="card p-6">
+    <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-slate-900">
@@ -270,7 +270,7 @@ function StepRow({
           type="button"
           onClick={handleRetry}
           disabled={retrying}
-          className="btn-secondary !px-2 !py-1 text-xs"
+          className="inline-flex items-center justify-center rounded-md bg-white text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed !px-2 !py-1 text-xs"
         >
           {retrying ? 'Retrying…' : 'Retry'}
         </button>
@@ -288,7 +288,7 @@ function HumanTasksPanel({
     return null;
   }
   return (
-    <section className="card p-6">
+    <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
       <h2 className="mb-3 text-base font-semibold text-slate-900">
         Manual follow-ups
       </h2>
@@ -327,7 +327,7 @@ function AuditLogPanel({
   entries: ClientDetail['audit_log'];
 }) {
   return (
-    <section className="card p-6">
+    <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
       <h2 className="mb-3 text-base font-semibold text-slate-900">
         Audit log
       </h2>
@@ -354,9 +354,9 @@ function AuditLogPanel({
 
 function NotFound() {
   return (
-    <div className="card p-6 text-center">
+    <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6 text-center">
       <p className="text-sm text-slate-600">Invalid client URL.</p>
-      <Link to="/" className="btn-secondary mt-3 inline-block">
+      <Link to="/" className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mt-3 inline-block">
         Back to dashboard
       </Link>
     </div>

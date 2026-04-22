@@ -53,7 +53,7 @@ export function App() {
 function NotFoundPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="card max-w-md p-8 text-center">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 max-w-md p-8 text-center">
         <h1 className="text-2xl font-semibold text-slate-900">Not found</h1>
         <p className="mt-2 text-sm text-slate-500">
           The page you are looking for does not exist.

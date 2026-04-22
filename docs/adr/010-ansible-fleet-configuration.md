@@ -1,4 +1,4 @@
-# ADR-009: Ansible fleet configuration over SSM
+# ADR-010: Ansible fleet configuration over SSM
 
 ## Status
 Accepted

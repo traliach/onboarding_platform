@@ -81,7 +81,7 @@ function PortalContent({ view }: { view: PortalView }) {
         </p>
       </header>
 
-      <section className="card mb-6 p-6">
+      <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 mb-6 p-6">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium text-slate-700">Overall progress</h2>
           <StatusBadge status={client.status} />
@@ -107,7 +107,7 @@ function PortalContent({ view }: { view: PortalView }) {
         </p>
       </section>
 
-      <section className="card mb-6 p-6">
+      <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 mb-6 p-6">
         <h2 className="mb-4 text-sm font-medium text-slate-700">
           Setup steps
         </h2>
@@ -130,7 +130,7 @@ function PortalContent({ view }: { view: PortalView }) {
       </section>
 
       {human_tasks.length > 0 && (
-        <section className="card p-6">
+        <section className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-6">
           <h2 className="mb-4 text-sm font-medium text-slate-700">
             What you need to do
           </h2>
@@ -187,7 +187,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function InvalidLink() {
   return (
     <Shell>
-      <div className="card p-8 text-center">
+      <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-200 p-8 text-center">
         <h1 className="text-xl font-semibold text-slate-900">
           This link is invalid or has expired
         </h1>

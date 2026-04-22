@@ -166,8 +166,10 @@ jobs:
 
       - name: Build image tag
         id: tag
-        # DATE-SHORTSHA-MSG format per CLAUDE.md §5. `main` is the stable
-        # pointer that infra.yml uses; the versioned tag is for rollback.
+        # DATE-SHORTSHA-MSG format per CLAUDE.md §5.
+        # One traceable tag per push — no mutable :main or :latest alias.
+        # render-inventory.sh queries ECR for the most-recent tag at deploy
+        # time so infra.yml always gets the latest good build.
         run: |
           DATE=$(date +%Y%m%d)
           SHORT_SHA=$(git rev-parse --short HEAD)
@@ -175,7 +177,6 @@ jobs:
           VERSIONED="${DATE}-${SHORT_SHA}-${MSG}"
           REGISTRY="${{ steps.ecr-login.outputs.registry }}/onboarding-platform"
           echo "versioned=${REGISTRY}:${VERSIONED}" >> "$GITHUB_OUTPUT"
-          echo "main=${REGISTRY}:main"               >> "$GITHUB_OUTPUT"
           echo "Tag: ${VERSIONED}"
 
       - name: Build and push
@@ -184,9 +185,7 @@ jobs:
           context: .
           file: server/Dockerfile
           push: true
-          tags: |
-            ${{ steps.tag.outputs.versioned }}
-            ${{ steps.tag.outputs.main }}
+          tags: ${{ steps.tag.outputs.versioned }}
           # Reuse layers cached by the docker job that ran in parallel.
           cache-from: type=gha
           cache-to: type=gha,mode=max

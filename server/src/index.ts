@@ -35,7 +35,7 @@ import { createInviteRouter } from './api/invite';
 import { createJobsRouter } from './api/jobs';
 import { createPortalRouter } from './api/portal';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
-import { register } from './metrics';
+import { register, bullmqQueueDepth } from './metrics';
 import { createDb, type Db } from './db/pool';
 import { createRootLogger, type Logger } from './logger';
 import {
@@ -288,6 +288,13 @@ async function main(): Promise<void> {
 
   if (config.appTarget === 'api') {
     const queue = createQueue(config, logger);
+    // Poll queue depth every 30 s so the JobQueueDepth alert has fresh data.
+    // The interval lives for the process lifetime; it is cleaned up on exit.
+    setInterval(() => {
+      void queue.getWaitingCount()
+        .then((n) => bullmqQueueDepth.set(n))
+        .catch(() => undefined);
+    }, 30_000);
     startApi(config, db, logger, queue);
   } else {
     const worker = createWorker(config, logger, createJobProcessor(db, logger));

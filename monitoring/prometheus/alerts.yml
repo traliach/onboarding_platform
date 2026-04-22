@@ -20,7 +20,7 @@ groups:
           description: "Less than 100 MB of memory available on {{ $labels.instance }}"
 
       - alert: JobQueueDepth
-        expr: bullmq_pending_jobs_total > 50
+        expr: bullmq_queue_depth > 50
         for: 5m
         labels:
           severity: warning
@@ -29,7 +29,7 @@ groups:
           description: "BullMQ has {{ $value }} pending jobs — threshold is 50"
 
       - alert: JobFailureRate
-        expr: increase(bullmq_failed_jobs_total[10m]) > 5
+        expr: increase(bullmq_jobs_failed_total[10m]) > 5
         for: 0m
         labels:
           severity: warning
