@@ -137,8 +137,8 @@ jobs:
   push:
     # Publishes the production image to ECR after ci + docker pass.
     # Only runs on push to main — PRs prove the image builds; they do
-    # not publish. Requires bootstrap to have been applied (ECR repo +
-    # OIDC role must exist). See infra/terraform/README.md.
+    # not publish. Requires account prerequisites to exist (ECR repo +
+    # OIDC role). See infra/terraform/README.md.
     name: push to ECR
     needs: [ci, docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

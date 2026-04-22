@@ -30,41 +30,35 @@ Cloud, Spacelift, etc.) is off the table.
 **Store Terraform state in S3 with a DynamoDB lock table, and
 authenticate GitHub Actions to AWS via OIDC — never static keys.**
 
-Implementation lives in a new `infra/terraform/bootstrap/` module,
-applied once per AWS account with **local** state. It creates three
-things:
+Implementation uses account prerequisites created outside this Terraform root
+module. They are intentionally not managed by the app module, because deleting
+the app fleet must never delete its own state backend or CI identity. The
+required resources are:
 
-1. `aws_s3_bucket.tfstate` — `onboarding-platform-tfstate`.
-   Versioned, AES256-encrypted, public access blocked,
-   `prevent_destroy = true`.
-2. `aws_dynamodb_table.tflocks` —
-   `onboarding-platform-tf-locks`. `PAY_PER_REQUEST` billing (zero
-   idle cost), `prevent_destroy = true`.
-3. `aws_iam_openid_connect_provider.github` +
-   `aws_iam_role.gha_oidc` — the identity provider and the role that
-   GitHub Actions assumes. Trust policy is scoped to a specific repo
-   (`var.github_repo`) via the `sub` claim. Permissions are
-   `PowerUserAccess` (AWS managed, no IAM) plus two inline policies:
-   one granting project-scoped `iam:*` actions for managing the EC2
-   SSM role, one granting narrow S3/DynamoDB access to the state
-   bucket and lock table only.
+1. S3 state bucket — `achille-tf-state`, shared across projects with
+   project-scoped keys, versioning, encryption, and public access blocked.
+2. DynamoDB lock table — `onboarding-platform-tf-lock`, `PAY_PER_REQUEST`
+   billing, used by Terraform's S3 backend for state locking.
+3. GitHub OIDC provider + role — `onboarding-platform-github-actions`, scoped
+   to this repository and used by GitHub Actions through
+   `AWS_ROLE_TO_ASSUME`.
 
 The root module's `versions.tf` declares the backend:
 
 ```hcl
 backend "s3" {
-  bucket         = "onboarding-platform-tfstate"
-  key            = "terraform.tfstate"
+  bucket         = "achille-tf-state"
+  key            = "onboarding-platform/terraform.tfstate"
   region         = "us-east-1"
-  dynamodb_table = "onboarding-platform-tf-locks"
+  dynamodb_table = "onboarding-platform-tf-lock"
   encrypt        = true
 }
 ```
 
-Apply order on a fresh account is strict: bootstrap first, then root.
-Running the root module first is a no-op failure —
-`terraform init` cannot find the bucket — rather than a silent
-misconfiguration, which is the behaviour we want.
+Apply order on a fresh account is strict: create the account prerequisites
+first, then run the root module. Running `terraform init` first fails because
+the backend bucket or lock table is missing, rather than silently falling back
+to local state.
 
 ## Consequences
 
@@ -84,10 +78,9 @@ misconfiguration, which is the behaviour we want.
   free.
 
 **Bad**
-- Bootstrap is a second Terraform configuration with its own state
-  file. New operators have to understand the "apply bootstrap once,
-  then never touch it" rule — `infra/terraform/README.md` documents
-  this at the top.
+- The account prerequisites are not recreated by this repo. New operators have
+  to know that the state bucket, lock table, ECR repository, and OIDC role must
+  already exist before `terraform init` succeeds.
 - `PowerUserAccess` is broader than strictly needed. A handcrafted
   least-privilege policy would be tighter but also 200+ actions of
   churn on every new resource type the root module adds. The
@@ -119,5 +112,5 @@ misconfiguration, which is the behaviour we want.
 - CLAUDE.md §8 (CI/CD rules) — OIDC secrets and `id-token: write`.
 - CLAUDE.md §10 (Security rules) — OIDC-only, no Admin, no static
   keys.
-- `infra/terraform/bootstrap/` — the implementation.
-- `infra/terraform/README.md` — apply order-of-operations.
+- `infra/terraform/versions.tf` — the S3 backend configuration.
+- `infra/terraform/README.md` — root module setup and prerequisites.

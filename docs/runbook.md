@@ -13,7 +13,7 @@ Operational reference for the `onboarding_platform` fleet.
 
 ---
 
-## First deploy (bootstrap → live fleet)
+## First deploy (account prerequisites → live fleet)
 
 This sequence runs once per AWS account. After it completes, the CI/CD
 pipeline (`infra.yml`) handles all subsequent deploys.
@@ -22,9 +22,10 @@ pipeline (`infra.yml`) handles all subsequent deploys.
 
 The S3 state bucket (`achille-tf-state`), DynamoDB lock table
 (`onboarding-platform-tf-lock`), ECR repository (`onboarding-platform`), and
-OIDC role (`onboarding-platform-github-actions`) are created once per AWS
-account via AWS CLI — not by Terraform. They must exist before running
-`terraform init`. See `docs/cost.md` for the one-time CLI commands.
+OIDC role (`onboarding-platform-github-actions`) are account prerequisites
+created outside this Terraform root module. They must exist before running
+`terraform init`; this repo no longer contains a separate Terraform
+account-setup module.
 
 **Step 2 — Set GitHub repo secrets**
 
@@ -286,14 +287,6 @@ terraform destroy
 > Remove that lifecycle rule before running `terraform destroy`, or the
 > destroy will fail with a lifecycle error.
 
-**Bootstrap teardown (run after root module is destroyed):**
-
-```bash
-cd infra/terraform/bootstrap
-# Empty the S3 state bucket first (versioned — must delete all versions)
-BUCKET="onboarding-platform-tfstate"
-aws s3api delete-objects --bucket "$BUCKET" \
-  --delete "$(aws s3api list-object-versions --bucket "$BUCKET" \
-    --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
-terraform destroy
-```
+The state bucket, lock table, ECR repository, and OIDC role are shared account
+prerequisites. Do not delete them as part of app teardown unless you are
+intentionally retiring the AWS account setup.

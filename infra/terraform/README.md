@@ -1,13 +1,8 @@
 # Terraform — `infra/terraform/`
 
-The full AWS footprint for `onboarding_platform`. Two Terraform
-configurations live here and are applied in a strict order:
-
-1. **`bootstrap/`** — one-time-per-account setup (S3 state bucket,
-   DynamoDB lock table, GitHub OIDC role). Uses **local** state.
-2. **Root module (this directory)** — the actual fleet (VPC, SGs,
-   EC2s, ALB, SSM endpoints). Uses the **S3 backend** created by
-   bootstrap.
+The full AWS footprint for `onboarding_platform`. This directory is the single
+Terraform root module in the repo: VPC, security groups, EC2s, ALB, and SSM
+endpoints. It uses a pre-existing S3 backend and DynamoDB lock table.
 
 ## Prerequisites
 
@@ -20,29 +15,28 @@ configurations live here and are applied in a strict order:
 
 ## First-time setup (new AWS account)
 
-```bash
-# 1 — create the state bucket + lock table (local state, applied once)
-cd infra/terraform/bootstrap
-terraform init
-terraform plan
-terraform apply
-cd ..
+Before `terraform init`, create or confirm the account prerequisites described
+in `docs/runbook.md`: S3 state bucket, DynamoDB lock table, ECR repository, and
+GitHub OIDC role. They are intentionally outside this root module so app
+teardown cannot destroy the state backend or CI identity.
 
-# 2 — init the root module against the S3 backend you just created
+```bash
 terraform init
 terraform plan
-# (review output — expect 5 EC2s, 1 VPC, 2 subnets, 5 SGs, ALB, 6 VPCEs)
+# review output — expect 5 EC2s, 1 VPC, 2 public subnets, 1 private subnet,
+# 5 SGs, ALB, and SSM/ECR/S3 endpoints
 terraform apply
 ```
 
-The root module's `terraform init` will fail until step 1 completes —
-this is by design. See the NOTE at the top of `versions.tf`.
+`terraform init` will fail if the backend bucket or lock table is missing. That
+is intentional; fix the account prerequisites rather than switching to local
+state.
 
 ## Day-to-day
 
-Only the root module is touched. `bootstrap/` is static; it does not
-get re-applied unless you're rotating state storage or adding a new
-CI role (unlikely).
+Only this root module is touched during normal work. Backend storage, the ECR
+repository, and the GitHub OIDC role are account-level prerequisites, not app
+infrastructure.
 
 ```bash
 cd infra/terraform
@@ -84,10 +78,9 @@ The DB EC2 and its EBS volume are protected by `prevent_destroy = true`
 temporarily — do not amend the root module in a PR that claims to be
 a refactor.
 
-`bootstrap/` itself should almost never be destroyed — tearing down
-the state bucket orphans the root module's history and makes the next
-`terraform plan` think the entire infrastructure is new. Both the
-bucket and the lock table are also protected by `prevent_destroy`.
+Do not delete the state bucket, lock table, ECR repository, or OIDC role during
+application teardown. They are shared account prerequisites and deleting them
+will break future plans/deploys.
 
 ## Cost shape
 

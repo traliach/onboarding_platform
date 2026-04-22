@@ -41,7 +41,7 @@ reached through the ALB (section 3).
 - **Failure isolation.** Grafana crashing (OOM, plugin fault, config reload
   gone wrong) must never take Prometheus down — alert evaluation and metric
   ingest have to keep working so the `JobQueueDepth` /
-  `HighMemoryUsage` / `InstanceDown` alerts still fire. Splitting the
+  `HighMemoryUsage` / `EC2Down` alerts still fire. Splitting the
   processes onto separate hosts is the simplest guarantee; no amount of
   systemd slice tuning matches an OS boundary.
 - **Scrape topology clarity.** When `prometheus.yml` lists `grafana:9100`

@@ -72,9 +72,9 @@ Infrastructure-specific patterns (new in this ADR):
   single line when human approval is wanted — the rest of the
   workflow is unchanged.
 
-Bootstrap is deliberately **not** run by CI. It's one-shot per AWS
-account, needs local state, and applying it from GitHub Actions is
-the chicken-and-egg problem ADR-007 solves by keeping it manual.
+Account prerequisites are deliberately **not** created by CI. The state bucket,
+lock table, ECR repository, and OIDC role must exist before the workflows run;
+`infra.yml` only plans and applies the root application infrastructure.
 
 ## Consequences
 
@@ -85,8 +85,8 @@ the chicken-and-egg problem ADR-007 solves by keeping it manual.
 - Failures are scoped: a red `infra` check on a client-only PR is
   impossible, so a red check always means something on the
   relevant codebase broke.
-- The infra role's blast radius is capped by OIDC + the inline
-  policies in `bootstrap/oidc.tf`. The client and server workflows
+- The infra role's blast radius is capped by OIDC and the role policy attached
+  to `onboarding-platform-github-actions`. The client and server workflows
   have no AWS identity at all, so an exploited build step in
   `client.yml` cannot touch S3/EC2/IAM.
 - Adding a fourth deployable (say, a `docs/` static site or a
@@ -115,7 +115,7 @@ the chicken-and-egg problem ADR-007 solves by keeping it manual.
 |---|---|
 | Single umbrella workflow, conditional jobs | Path filters still work but the top-level permissions block has to be the union of all jobs' needs — least-privilege is lost. The "one red check column" problem (above) also regresses. |
 | Reusable workflow called from three thin callers | Solves node-setup duplication at the cost of indirection. The callers become ~20 lines each, the reusable workflow becomes ~150, and auditing "what runs on an infra PR" now requires reading two files instead of one. |
-| `tfsec` / `checkov` in infra.yml today | Security scanning is a net-positive addition, but the first run surfaces a backlog of low-severity findings that would block the ADR-007 bootstrap work. Scheduled as a separate PR so the backlog triage doesn't stall the happy path. |
+| `tfsec` / `checkov` in infra.yml today | Security scanning is a net-positive addition, but the first run surfaces a backlog of low-severity findings that would block the deployment path. Scheduled as a separate PR so backlog triage does not stall the happy path. |
 | Running `terraform apply` on PR merge-to-main via a `pull_request.closed` event | Feels clever, actually loses: merge commits on `main` already trigger `push`, and `pull_request.closed` also fires on cancelled/unmerged PRs — we'd need to filter on `github.event.pull_request.merged`, at which point the `push` trigger is simpler and more obvious. |
 | Applying from a protected long-lived `staging` branch before `main` | Worth doing when there's a staging environment. For a single-environment $47/month lab, a staging branch is ceremony. Revisit when a second AWS account or a non-prod Vercel project lands. |
 

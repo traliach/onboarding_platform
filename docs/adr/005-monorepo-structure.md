@@ -46,8 +46,8 @@ separate repositories.
   the exact types the frontend imports. There is no npm publish, no version
   bump, no private registry. If the types change, both sides see it on the
   next `tsc`.
-- **Single source of truth for the story.** CLAUDE.md, the build story
-  document, the ADRs, and the code it all references live in one Git log.
+- **Single source of truth for project decisions.** The ADRs, README, docs,
+  workflows, and the code they reference live in one Git log.
   A reader reviewing the project can `git log --oneline` once and see every
   decision, every fix, every wrong turn in order. Split repos fragment the
   narrative.

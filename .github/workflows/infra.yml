@@ -24,9 +24,8 @@
 #
 # Secrets / variables required (set in repo settings → Secrets and
 # variables → Actions):
-#   - AWS_ROLE_TO_ASSUME       — ARN of the OIDC role created by
-#                                infra/terraform/bootstrap/ (the
-#                                `gha_oidc_role_arn` output).
+#   - AWS_ROLE_TO_ASSUME       — ARN of the pre-existing GitHub OIDC role
+#                                (`onboarding-platform-github-actions`).
 #   - AWS_REGION               — e.g. us-east-1. Must match the region
 #                                in the backend "s3" block and in
 #                                infra/terraform/variables.tf.
@@ -35,8 +34,8 @@
 #                                (required by the apply job only).
 #
 # If AWS_ROLE_TO_ASSUME or AWS_REGION is missing the workflow fails at
-# `Configure AWS credentials` — that's the intended "you haven't
-# bootstrapped yet" signal.
+# `Configure AWS credentials` — that's the intended "account prerequisites
+# are missing" signal.
 
 name: infra
 
@@ -101,15 +100,13 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform fmt
-        # -recursive also covers bootstrap/, even though bootstrap/
-        # is not applied here. Formatting drift in bootstrap/ still
-        # fails this check, which is the point.
+        # -recursive also covers nested modules under infra/terraform/modules/.
         run: terraform fmt -check -recursive
 
       - name: Terraform init (no backend)
         # `-backend=false` skips the S3 bucket lookup so this step
-        # works before the bootstrap module has been applied in a
-        # new account — useful for first-time contributors.
+        # works before account prerequisites exist — useful for first-time
+        # contributors who only need syntax validation.
         run: terraform init -backend=false
 
       - name: Terraform validate

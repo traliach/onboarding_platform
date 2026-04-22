@@ -44,7 +44,7 @@ surface, and the infrastructure story, not the integrations themselves.
 
 | Area | State |
 |------|-------|
-| Backend | **Complete.** API, worker, dual auth (JWT + UUID token), analytics, tier-based step registry, retry endpoint, Docker image, 33-test suite. |
+| Backend | **Complete.** API, worker, dual auth (JWT + UUID token), analytics, tier-based step registry, retry endpoint, Docker image, 45-test suite. |
 | Frontend | **Complete.** Dashboard (clients + analytics tabs), portal page, login, client detail with live step polling and retry UI. Deployed to Vercel free tier. |
 | Local stack | **Complete.** `docker compose up` starts the full backend in one command. |
 | Terraform | **Complete.** VPC, security groups (per-tier SG segmentation), 5 × t2.micro EC2s, ALB, SSM VPC endpoints, S3 remote state + DynamoDB locking, GitHub OIDC role. |
@@ -108,10 +108,8 @@ Then:
 - Readiness:      http://localhost:4000/health/ready
 - Default admin:  `admin@onboarding.local` / `changeme-dev-only`
 
-Log in, create a client, watch the worker output stream step-by-step in
-`docker compose logs -f worker`. End-to-end transcript for a fresh
-`POST /clients` through to completed `job_steps` is in the build story
-document under "Chapter 4 — Tier-based workflow engine".
+Log in, create a client, and watch the worker output stream step-by-step in
+`docker compose logs -f worker`.
 
 Tests:
 
@@ -120,8 +118,8 @@ cd server
 npm test
 ```
 
-33 tests run in under two seconds (passwords, tokens, step handlers,
-workflow registry, auth HTTP integration).
+45 tests run in under two seconds (passwords, tokens, step handlers,
+workflow registry, auth and invite HTTP integration).
 
 ## Auth — two patterns, one project
 
@@ -136,10 +134,10 @@ workflow registry, auth HTTP integration).
   no session, no other client's data visible. `GET /portal/:token`
   returns plain-English labels instead of internal step names.
 
-The "two patterns, one project" reasoning — and why this is a legitimate
-production pattern (GuideCX and Rocketlane ship the same split) — is
-captured as **Chapter 3** of the build story document. The non-negotiable
-security rules that both patterns obey live in CLAUDE.md section 10.
+The invite-only registration decision is captured in
+[ADR-009](./docs/adr/009-invite-only-registration.md). The security contract is
+simple: JWTs stay in httpOnly cookies, portal tokens are scoped UUID links, and
+new staff accounts require an authenticated admin invite.
 
 ## Cost
 
@@ -180,10 +178,9 @@ Full breakdown with upgrade-path pricing in [`docs/cost.md`](./docs/cost.md).
   `monitoring/grafana/dashboards/fleet-overview.json` and
   `onboarding-jobs.json`. Both are committed; there is no click-to-edit
   dashboard in production.
-- **Alerts** (`monitoring/prometheus/alerts.yml`): `InstanceDown`,
+- **Alerts** (`monitoring/prometheus/alerts.yml`): `EC2Down`,
   `JobQueueDepth`, `HighMemoryUsage`, `JobFailureRate`. Each is verified
-  firing by deliberately triggering the condition — build-story Chapter
-  10 will document the verification runs.
+  firing by deliberately triggering the condition.
 
 The monitoring EC2s are deliberately separate from the app/worker tier —
 see **ADR-003** for the reasoning (fleet uniformity + failure isolation
@@ -208,7 +205,7 @@ AWS authentication is OIDC — no static access keys in GitHub secrets.
 client/         React 19 + Vite + Tailwind — dashboard + portal
 server/         Node.js + TypeScript — Express API, BullMQ worker, Docker image
 infra/
-  terraform/    VPC, security groups, 5 × EC2, ALB, SSM endpoints + bootstrap
+  terraform/    VPC, security groups, 5 × EC2, ALB, SSM endpoints
   ansible/      six idempotent roles, master playbook, vault-encrypted secrets
 monitoring/     Prometheus config + alert rules + Grafana dashboard JSON
 scripts/        render-inventory.sh — Terraform outputs → Ansible hosts.yml
