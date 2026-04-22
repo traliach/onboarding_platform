@@ -21,17 +21,28 @@ handles subsequent client, server image, and Terraform deploys. For `infra.yml`
 to run Ansible, the encrypted `infra/ansible/group_vars/all/vault.yml` must be
 committed and `ANSIBLE_VAULT_PASSWORD` must exist in GitHub Actions secrets.
 
-Before applying changes, run the deploy preflight from repo root:
+Before applying changes, run the smoke-phase preflight from repo root. This is
+the correct mode before DNS and ACM exist; it checks the backend deploy path and
+allows the temporary HTTP ALB health-check URL:
+
+```bash
+ARTIFACT_STRATEGY=controlled-outbound \
+bash scripts/deploy-preflight.sh --phase=smoke
+```
+
+`ARTIFACT_STRATEGY` is an operator decision for first-install package access:
+`controlled-outbound`, `s3-artifacts`, or `prebaked-ami`.
+
+After the smoke deploy is healthy and you have a real API domain plus ACM
+certificate, run the production-phase preflight before deploying the browser
+bundle:
 
 ```bash
 FINAL_API_ORIGIN=https://api.example.com \
 TF_VAR_alb_certificate_arn=arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id \
 ARTIFACT_STRATEGY=controlled-outbound \
-bash scripts/deploy-preflight.sh
+bash scripts/deploy-preflight.sh --phase=production
 ```
-
-`ARTIFACT_STRATEGY` is an operator decision for first-install package access:
-`controlled-outbound`, `s3-artifacts`, or `prebaked-ami`.
 
 ### First-deploy execution log
 

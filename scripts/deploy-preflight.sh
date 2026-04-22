@@ -17,25 +17,41 @@ VAULT_FILE="infra/ansible/group_vars/all/vault.yml"
 FAILURES=0
 WARNINGS=0
 LOCAL_ONLY=false
+PHASE="smoke"
 
 for arg in "$@"; do
   case "${arg}" in
     --local-only)
       LOCAL_ONLY=true
       ;;
+    --phase=smoke)
+      PHASE="smoke"
+      ;;
+    --phase=production)
+      PHASE="production"
+      ;;
+    --production)
+      PHASE="production"
+      ;;
     -h|--help)
       cat <<'EOF'
-Usage: scripts/deploy-preflight.sh [--local-only]
+Usage: scripts/deploy-preflight.sh [--phase=smoke|production] [--local-only]
 
 Checks deploy prerequisites without changing AWS, GitHub, Vercel, Terraform, or
 Ansible state. Use --local-only to skip cloud/API checks and validate only local
 tooling, repo policy, and configuration shape.
 
+Phases:
+  smoke       First backend deploy. Allows HTTP ALB smoke checks and does not
+              require DNS, ACM, FINAL_API_ORIGIN, or Vercel env yet. Default.
+  production  Browser-ready deploy. Requires HTTPS API origin, ACM certificate,
+              and Vercel Production VITE_API_BASE_URL.
+
 Important environment variables:
   AWS_REGION or REGION                 AWS region, default us-east-1
   AWS_ACCOUNT_ID                       optional expected AWS account guard
-  FINAL_API_ORIGIN                     required browser API origin, must be https://
-  TF_VAR_alb_certificate_arn           ACM certificate ARN for the ALB HTTPS listener
+  FINAL_API_ORIGIN                     production browser API origin, must be https://
+  TF_VAR_alb_certificate_arn           production ACM certificate ARN for ALB HTTPS
   ARTIFACT_STRATEGY                    one of controlled-outbound, s3-artifacts, prebaked-ami
 EOF
       exit 0
@@ -78,6 +94,7 @@ section() {
 }
 
 section "Local tooling"
+ok "preflight phase: ${PHASE}"
 for cmd in aws terraform docker jq gh node npm npx openssl git; do
   require_cmd "${cmd}"
 done
@@ -148,27 +165,32 @@ else
   fail "${VAULT_FILE} is missing; copy vault.yml.example, fill real values, ansible-vault encrypt it, then git add it"
 fi
 
-section "HTTPS production origin"
-FINAL_API_ORIGIN="${FINAL_API_ORIGIN:-}"
-if [[ "${FINAL_API_ORIGIN}" == https://* ]]; then
-  ok "FINAL_API_ORIGIN is HTTPS"
-else
-  fail "FINAL_API_ORIGIN must be set to the final HTTPS API origin, for example https://api.example.com"
-fi
-
-CERT_ARN="${TF_VAR_alb_certificate_arn:-${ALB_CERTIFICATE_ARN:-}}"
-if [[ -z "${CERT_ARN}" && -f "infra/terraform/terraform.tfvars" ]]; then
-  if grep -Eq '^[[:space:]]*alb_certificate_arn[[:space:]]*=[[:space:]]*"arn:aws[^"]+:acm:' infra/terraform/terraform.tfvars; then
-    CERT_ARN="set-in-terraform.tfvars"
+if [[ "${PHASE}" == "production" ]]; then
+  section "HTTPS production origin"
+  FINAL_API_ORIGIN="${FINAL_API_ORIGIN:-}"
+  if [[ "${FINAL_API_ORIGIN}" == https://* ]]; then
+    ok "FINAL_API_ORIGIN is HTTPS"
+  else
+    fail "FINAL_API_ORIGIN must be set to the final HTTPS API origin, for example https://api.example.com"
   fi
-fi
 
-if [[ "${CERT_ARN}" == set-in-terraform.tfvars ]]; then
-  ok "alb_certificate_arn is set in infra/terraform/terraform.tfvars"
-elif [[ "${CERT_ARN}" =~ ^arn:[^:]+:acm:[a-z0-9-]+:[0-9]{12}:certificate/.+ ]]; then
-  ok "ALB ACM certificate ARN is set"
+  CERT_ARN="${TF_VAR_alb_certificate_arn:-${ALB_CERTIFICATE_ARN:-}}"
+  if [[ -z "${CERT_ARN}" && -f "infra/terraform/terraform.tfvars" ]]; then
+    if grep -Eq '^[[:space:]]*alb_certificate_arn[[:space:]]*=[[:space:]]*"arn:aws[^"]+:acm:' infra/terraform/terraform.tfvars; then
+      CERT_ARN="set-in-terraform.tfvars"
+    fi
+  fi
+
+  if [[ "${CERT_ARN}" == set-in-terraform.tfvars ]]; then
+    ok "alb_certificate_arn is set in infra/terraform/terraform.tfvars"
+  elif [[ "${CERT_ARN}" =~ ^arn:[^:]+:acm:[a-z0-9-]+:[0-9]{12}:certificate/.+ ]]; then
+    ok "ALB ACM certificate ARN is set"
+  else
+    fail "Set TF_VAR_alb_certificate_arn or infra/terraform/terraform.tfvars alb_certificate_arn before browser-ready production deploy"
+  fi
 else
-  fail "Set TF_VAR_alb_certificate_arn or infra/terraform/terraform.tfvars alb_certificate_arn before browser-ready production deploy"
+  section "HTTPS production origin"
+  warn "Skipped HTTPS API origin and ACM certificate checks for smoke phase"
 fi
 
 section "Artifact access decision"
@@ -236,28 +258,46 @@ else
     if [[ -z "${GH_SECRETS}" ]]; then
       fail "Could not list GitHub secrets for this repository"
     else
-      for secret in AWS_ROLE_TO_ASSUME AWS_REGION ANSIBLE_VAULT_PASSWORD VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+      REQUIRED_SECRETS="AWS_ROLE_TO_ASSUME AWS_REGION ANSIBLE_VAULT_PASSWORD"
+      if [[ "${PHASE}" == "production" ]]; then
+        REQUIRED_SECRETS="${REQUIRED_SECRETS} VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID"
+      fi
+      for secret in ${REQUIRED_SECRETS}; do
         if printf '%s\n' "${GH_SECRETS}" | grep -qx "${secret}"; then
           ok "GitHub secret exists: ${secret}"
         else
           fail "GitHub secret missing: ${secret}"
         fi
       done
+      if [[ "${PHASE}" == "smoke" ]]; then
+        for secret in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+          if printf '%s\n' "${GH_SECRETS}" | grep -qx "${secret}"; then
+            ok "GitHub secret exists: ${secret}"
+          else
+            warn "GitHub secret not checked for smoke phase: ${secret}"
+          fi
+        done
+      fi
     fi
   else
     fail "gh is not authenticated for this repository"
   fi
 
-  section "Vercel environment"
-  if have vercel; then
-    VERCEL_ENV="$(cd client && vercel env ls production 2>/dev/null || true)"
-    if printf '%s\n' "${VERCEL_ENV}" | grep -q 'VITE_API_BASE_URL'; then
-      ok "Vercel Production env has VITE_API_BASE_URL"
+  if [[ "${PHASE}" == "production" ]]; then
+    section "Vercel environment"
+    if have vercel; then
+      VERCEL_ENV="$(cd client && vercel env ls production 2>/dev/null || true)"
+      if printf '%s\n' "${VERCEL_ENV}" | grep -q 'VITE_API_BASE_URL'; then
+        ok "Vercel Production env has VITE_API_BASE_URL"
+      else
+        fail "Vercel Production env is missing VITE_API_BASE_URL"
+      fi
     else
-      fail "Vercel Production env is missing VITE_API_BASE_URL"
+      warn "vercel CLI is not installed globally; verify VITE_API_BASE_URL in the Vercel dashboard or install vercel and rerun"
     fi
   else
-    warn "vercel CLI is not installed globally; verify VITE_API_BASE_URL in the Vercel dashboard or install vercel and rerun"
+    section "Vercel environment"
+    warn "Skipped Vercel Production env checks for smoke phase"
   fi
 fi
 
