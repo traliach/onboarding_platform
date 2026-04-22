@@ -20,7 +20,10 @@ ansible-vault encrypt group_vars/all/vault.yml
 # store the vault password outside the repo
 ```
 
-`vault.yml` is gitignored. Never commit the decrypted file.
+Commit the encrypted `group_vars/all/vault.yml`. GitHub Actions needs the
+encrypted file from git plus the `ANSIBLE_VAULT_PASSWORD` secret to run the
+Ansible deploy. Never commit plaintext vault copies; use a gitignored scratch
+name such as `vault.plain.yml` when editing manually.
 
 Use a **URL-safe** database password — it is embedded in `DATABASE_URL` inside
 the generated env files.
@@ -30,8 +33,7 @@ the generated env files.
 After every `terraform apply` that changes instance IDs or private IPs:
 
 ```bash
-cd infra/ansible
-./scripts/render-inventory.sh
+bash scripts/render-inventory.sh
 ```
 
 This writes `inventory/hosts.yml` (gitignored) with `ansible_host` = instance id

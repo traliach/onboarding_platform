@@ -6,17 +6,32 @@ Operational reference for the `onboarding_platform` fleet.
 
 - AWS CLI v2 configured with a named profile (`AWS_PROFILE=onboarding`)
 - Session Manager Plugin installed (`session-manager-plugin`)
-- Terraform >= 1.9
+- Terraform >= 1.5
 - Ansible >= 2.16, `amazon.aws` + `community.postgresql` collections
 - `jq` (used by `scripts/render-inventory.sh`)
 - GitHub CLI (`gh`) for CI/CD checks
+- Node.js >= 22 + npm/npx for Vercel CLI commands
 
 ---
 
 ## First deploy (account prerequisites → live fleet)
 
-This sequence runs once per AWS account. After it completes, the CI/CD
-pipeline (`infra.yml`) handles all subsequent deploys.
+This sequence runs once per AWS account. After it completes, the CI/CD pipeline
+handles subsequent client, server image, and Terraform deploys. For `infra.yml`
+to run Ansible, the encrypted `infra/ansible/group_vars/all/vault.yml` must be
+committed and `ANSIBLE_VAULT_PASSWORD` must exist in GitHub Actions secrets.
+
+Before applying changes, run the deploy preflight from repo root:
+
+```bash
+FINAL_API_ORIGIN=https://api.example.com \
+TF_VAR_alb_certificate_arn=arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id \
+ARTIFACT_STRATEGY=controlled-outbound \
+bash scripts/deploy-preflight.sh
+```
+
+`ARTIFACT_STRATEGY` is an operator decision for first-install package access:
+`controlled-outbound`, `s3-artifacts`, or `prebaked-ami`.
 
 **Step 1 — Confirm pre-existing AWS resources**
 
@@ -32,11 +47,13 @@ account-setup module.
 ```bash
 MSYS_NO_PATHCONV=1 gh secret set AWS_ROLE_TO_ASSUME   # paste OIDC role ARN
 MSYS_NO_PATHCONV=1 gh secret set AWS_REGION           # e.g. us-east-1
-MSYS_NO_PATHCONV=1 gh secret set ANSIBLE_VAULT_PASSWORD
 MSYS_NO_PATHCONV=1 gh secret set VERCEL_TOKEN
 MSYS_NO_PATHCONV=1 gh secret set VERCEL_ORG_ID
 MSYS_NO_PATHCONV=1 gh secret set VERCEL_PROJECT_ID
 ```
+
+Set `ANSIBLE_VAULT_PASSWORD` after Step 5, once the real vault has been
+created and encrypted.
 
 **Step 3 — Apply root Terraform module**
 
@@ -47,18 +64,26 @@ terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
+Set `TF_VAR_alb_certificate_arn` or `alb_certificate_arn` in an ignored
+`terraform.tfvars` when you are ready for the ALB HTTPS listener.
+
 **Step 4 — Build and push the Docker image to ECR**
 
 ```bash
 # Get ECR registry URL from AWS
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+REGION="${REGION:-us-east-1}"
 ECR="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
-SHA=$(git rev-parse HEAD)
+DATE=$(date +%Y%m%d)
+SHORT_SHA=$(git rev-parse --short HEAD)
+MSG=$(git log -1 --pretty=format:"%s" | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c1-30)
+TAG="${DATE}-${SHORT_SHA}-${MSG}"
 
-aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR"
-docker build -t "${ECR}/onboarding-platform:${SHA}" -f server/Dockerfile .
-docker push "${ECR}/onboarding-platform:${SHA}"
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$ECR"
+docker build -t "${ECR}/onboarding-platform:${TAG}" -f server/Dockerfile .
+docker push "${ECR}/onboarding-platform:${TAG}"
+export DEPLOY_IMAGE_TAG="$TAG"
 ```
 
 **Step 5 — Create and encrypt the Ansible vault**
@@ -80,17 +105,22 @@ Encrypt (the vault password becomes `ANSIBLE_VAULT_PASSWORD` in GitHub):
 
 ```bash
 ansible-vault encrypt infra/ansible/group_vars/all/vault.yml
+MSYS_NO_PATHCONV=1 gh secret set ANSIBLE_VAULT_PASSWORD
+git add infra/ansible/group_vars/all/vault.yml
 ```
 
-`vault.yml` is gitignored — never commit the decrypted or encrypted file.
-The committed deliverable is `vault.yml.example` with placeholder values.
+Commit the encrypted `vault.yml`; it is safe to commit after Ansible Vault
+encryption and is required for CI. Never commit plaintext vault copies.
 
 **Step 6 — Render inventory and run Ansible**
 
 ```bash
 bash scripts/render-inventory.sh    # reads terraform output, writes hosts.yml
 cd infra/ansible
-ansible-playbook playbooks/site.yml --ask-vault-pass
+FRONTEND_ORIGIN=https://app.example.com
+ansible-playbook playbooks/site.yml \
+  --ask-vault-pass \
+  -e "onboarding_platform_frontend_origin=${FRONTEND_ORIGIN}"
 ```
 
 **Step 7 — Verify**
@@ -101,8 +131,8 @@ curl -sf "http://${ALB}/health"
 # Expected: {"status":"ok"}
 ```
 
-After a successful first deploy, push a commit to `main` and let the
-CI/CD pipeline own all future deploys.
+After a successful first deploy, push a commit to `main` and let the CI/CD
+pipeline own routine deploys.
 
 ---
 
@@ -114,7 +144,7 @@ Push to `main` — the three GitHub Actions workflows handle the rest:
 |----------|---------|--------------|
 | `client.yml` | changes under `client/` | lint → test → build → Vercel deploy |
 | `server.yml` | changes under `server/` | lint → test → Docker build → push ECR |
-| `infra.yml` | changes under `infra/` or `monitoring/` | fmt/validate → plan (PR) → apply + Ansible + smoke test (main) |
+| `infra.yml` | changes under `infra/` or `monitoring/` | fmt/validate → plan (PR) → apply + Ansible + smoke test (main); requires committed encrypted vault.yml |
 
 Monitor progress: `gh run list --limit 5`
 

@@ -90,5 +90,6 @@ module "alb" {
   public_subnet_ids = module.networking.public_subnet_ids
   alb_sg_id         = module.security.alb_sg_id
   app_instance_id   = module.compute.app_instance_id
+  certificate_arn   = var.alb_certificate_arn
   tags              = local.common_tags
 }

@@ -58,9 +58,12 @@ docs/deploy.md
 # Transient curl / dev artifacts
 cookies.txt
 
-# Ansible — decrypted vault, local password files, installed collections,
-# inventory cache, virtualenv. The .example files ARE committed.
-infra/ansible/group_vars/all/vault.yml
+# Ansible — encrypted vault.yml is intentionally committed so infra.yml can
+# decrypt it with ANSIBLE_VAULT_PASSWORD. Ignore plaintext scratch files,
+# local password files, installed collections, inventory cache, and virtualenv.
+infra/ansible/group_vars/all/vault.plain.yml
+infra/ansible/group_vars/all/*.plain.yml
+infra/ansible/group_vars/all/*.decrypted.yml
 infra/ansible/inventory/hosts.yml
 infra/ansible/.vault-pass
 infra/ansible/collections/

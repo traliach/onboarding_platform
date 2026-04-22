@@ -151,7 +151,7 @@ These are documented trade-offs, not planned work:
 | Current | Upgrade | Trigger |
 |---------|---------|---------|
 | Single AZ | Multi-AZ with RDS read replica | SLA requirement |
-| HTTP only (ALB port 80) | HTTPS with ACM certificate on ALB + HTTPS redirect | Custom domain |
+| HTTP smoke path on ALB port 80 | ACM-backed HTTPS listener via `alb_certificate_arn` | Custom API domain |
 | SSM-only access | Jump host or Tailscale | Compliance audit requirement |
 | Self-managed PostgreSQL | RDS | Eliminating DBA operational burden |
 | BullMQ on EC2 | SQS + Lambda | Burst workloads > 50 concurrent jobs |

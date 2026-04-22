@@ -8,6 +8,11 @@ output "alb_dns_name" {
   value       = module.alb.alb_dns_name
 }
 
+output "alb_https_listener_arn" {
+  description = "HTTPS listener ARN when var.alb_certificate_arn is set; null for HTTP-only smoke-test deployments."
+  value       = module.alb.https_listener_arn
+}
+
 output "instance_ids" {
   description = "Map of role -> EC2 instance id. Used by Ansible for SSM targeting."
   value       = module.compute.instance_ids

@@ -1,10 +1,9 @@
 # Example of what group_vars/all/vault.yml must contain.
 #
-# The real vault.yml is gitignored (see .gitignore) and must be
-# encrypted with `ansible-vault encrypt vault.yml`. Never commit the
-# real file, encrypted or otherwise — a committed encrypted vault is
-# a recoverable secret once the password leaks, and in a portfolio
-# project the password will leak the minute the repo goes public.
+# The real vault.yml must be encrypted with `ansible-vault encrypt vault.yml`
+# before it is committed. That gives CI both required pieces: encrypted
+# vault.yml from git and ANSIBLE_VAULT_PASSWORD from GitHub secrets.
+# Plaintext scratch copies such as vault.plain.yml stay gitignored.
 #
 # CLAUDE.md §5: every key is prefixed `onboarding_platform_`. No
 # company, client, or person identifiers.
@@ -12,7 +11,8 @@
 # To set up locally:
 #   1. Copy this file to vault.yml, replace the placeholder values.
 #   2. Run `ansible-vault encrypt vault.yml` and enter a password.
-#   3. Save that password to .vault-pass (gitignored) OR export
+#   3. Commit the encrypted vault.yml. Never commit plaintext secrets.
+#   4. Save that password to .vault-pass (gitignored) OR export
 #      ANSIBLE_VAULT_PASSWORD_FILE=/path/to/password.
 #
 # For CI:

@@ -1,6 +1,6 @@
 ---
-# Non-secret defaults. Secrets live in vault.yml (gitignored — copy from
-# vault.example.yml and `ansible-vault encrypt`).
+# Non-secret defaults. Secrets live in vault.yml, which must be Ansible Vault
+# encrypted before commit. Plaintext scratch copies stay gitignored.
 
 onboarding_platform_db_name: onboarding
 onboarding_platform_db_user: onboarding

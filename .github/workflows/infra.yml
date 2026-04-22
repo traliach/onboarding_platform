@@ -29,8 +29,8 @@
 #   - AWS_REGION               — e.g. us-east-1. Must match the region
 #                                in the backend "s3" block and in
 #                                infra/terraform/variables.tf.
-#   - ANSIBLE_VAULT_PASSWORD   — password used to decrypt
-#                                infra/ansible/group_vars/all/vault.yml
+#   - ANSIBLE_VAULT_PASSWORD   — password used to decrypt the committed
+#                                encrypted infra/ansible/group_vars/all/vault.yml
 #                                (required by the apply job only).
 #
 # If AWS_ROLE_TO_ASSUME or AWS_REGION is missing the workflow fails at
@@ -90,6 +90,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check Ansible vault is encrypted
+        working-directory: ${{ github.workspace }}
+        run: |
+          test -f infra/ansible/group_vars/all/vault.yml
+          head -n 1 infra/ansible/group_vars/all/vault.yml | grep -q '^\$ANSIBLE_VAULT;'
 
       - name: Setup Terraform ${{ env.TF_VERSION }}
         uses: hashicorp/setup-terraform@v3

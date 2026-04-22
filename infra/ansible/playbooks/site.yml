@@ -6,8 +6,8 @@
 #   - AWS creds (profile or env) with ssm:StartSession on the fleet
 #   - ansible-galaxy collection install -r requirements.yml
 #
-# Inventory: run ../scripts/render-inventory.sh after terraform apply, then
-# optionally ansible-vault-encrypt group_vars/all/vault.yml
+# Inventory: run scripts/render-inventory.sh from the repo root after
+# terraform apply. group_vars/all/vault.yml must already be encrypted.
 
 - name: Common baseline on all EC2s
   hosts: all

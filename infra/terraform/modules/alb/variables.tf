@@ -23,6 +23,12 @@ variable "app_instance_id" {
   type        = string
 }
 
+variable "certificate_arn" {
+  description = "Optional ACM certificate ARN. When set, the module creates an HTTPS listener on port 443."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Tags merged into every resource."
   type        = map(string)

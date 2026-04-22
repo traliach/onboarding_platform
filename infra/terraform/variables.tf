@@ -57,6 +57,17 @@ variable "allowed_http_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "alb_certificate_arn" {
+  description = "Optional ACM certificate ARN for the ALB HTTPS listener. Leave empty for HTTP-only smoke-test deployments."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.alb_certificate_arn == "" || can(regex("^arn:[^:]+:acm:[a-z0-9-]+:[0-9]{12}:certificate/.+", var.alb_certificate_arn))
+    error_message = "alb_certificate_arn must be empty or a valid ACM certificate ARN."
+  }
+}
+
 variable "tags" {
   description = "Extra tags merged into all resources."
   type        = map(string)

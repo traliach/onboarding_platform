@@ -86,10 +86,10 @@ no wildcard — via the `CORS_ALLOWED_ORIGINS` environment variable that
   the frontend is served from — the main production domain plus any
   custom domains, but **never** the preview URLs, which are generated
   per-PR and would require a wildcard match the server rejects.
-- The API must be reachable from Vercel's edge over public HTTPS — i.e.
-  through the ALB. The API EC2 and the database and the worker all stay
-  private; only the ALB has a public listener. That is already the
-  architecture (ADR-001, CLAUDE.md section 9).
+- The API must be reachable from Vercel's edge over public HTTPS through the
+  ALB. Set `alb_certificate_arn` to create the ACM-backed ALB HTTPS listener.
+  The API EC2, database, and worker all stay private; only the ALB has a
+  public listener.
 - Preview deployments (`*.vercel.app`) cannot authenticate against the
   production API because their origin is not on the CORS allow-list.
   Either add a separate staging API deployment with a permissive CORS

@@ -20,9 +20,10 @@ generated from Terraform outputs (`instance_ids`, `instance_private_ips`) via
 EC2 instance id (required for SSM) and carries `private_ip` for DB URLs, Redis
 URLs, and Prometheus static scrape targets.
 
-Secrets live in **Ansible Vault** under `group_vars/all/vault.yml` (gitignored
-plaintext; encrypted file is the intended CI shape once a password file exists
-in GitHub Actions secrets).
+Secrets live in **Ansible Vault** under `group_vars/all/vault.yml`. The
+encrypted file is committed so GitHub Actions has something to decrypt; only
+plaintext scratch copies and local vault password files are gitignored. The
+vault password lives in the GitHub secret `ANSIBLE_VAULT_PASSWORD`.
 
 ## Rationale
 - **SSM-native** — matches the security model (no SSH keys, no bastion).
@@ -46,6 +47,11 @@ in GitHub Actions secrets).
 ## Consequences
 - Operators must run `ansible-galaxy collection install -r requirements.yml`
   once per controller.
+- CI deploys require both the committed encrypted `vault.yml` and the
+  `ANSIBLE_VAULT_PASSWORD` GitHub secret.
+- Because the fleet has no NAT gateway, roles that install upstream packages
+  need a first-boot artifact strategy: controlled outbound HTTPS, S3-staged
+  artifacts, or pre-baked AMIs.
 - A first-time deploy requires **Terraform apply → ECR push → render-inventory
   → ansible-playbook** in that order.
 - Grafana ships with datasource provisioning only; dashboard JSON lives in

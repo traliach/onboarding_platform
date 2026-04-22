@@ -155,6 +155,8 @@ Target: **~$47/month** end-to-end (AWS fleet + Vercel frontend).
 Key cost decisions:
 
 - **No NAT gateway** — SSM VPC endpoints instead (ADR-001). Saves ~$33/mo.
+  First-install package artifacts still need an explicit strategy:
+  controlled outbound HTTPS, S3-staged artifacts, or pre-baked AMIs.
 - **No bastion EC2** — SSM Session Manager gives shell to every private
   host (ADR-001).
 - **BullMQ on the worker EC2** — no managed-queue per-request billing

@@ -40,11 +40,16 @@ infrastructure.
 
 ```bash
 cd infra/terraform
+export TF_VAR_alb_certificate_arn=arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id  # browser-ready HTTPS API
 terraform fmt -check -recursive   # CI-equivalent
 terraform validate
 terraform plan -out=tfplan
 terraform apply tfplan
 ```
+
+`alb_certificate_arn` is optional for backend smoke-test deployments. Set it
+when attaching a production API domain; the ALB module will add a 443 listener
+using that ACM certificate.
 
 ## Outputs consumed by Ansible
 
@@ -55,6 +60,7 @@ terraform apply tfplan
   default ECR image URI.
 - `alb_dns_name` — public entrypoint; used by the `infra.yml`
   workflow's smoke test and (later) by a Route53 alias record.
+- `alb_https_listener_arn` — null unless `alb_certificate_arn` is set.
 - `instance_ids` — role → EC2 id map; used by Ansible for SSM-based
   dynamic inventory.
 - `instance_private_ips` — role → private IPv4 map; also used by the
