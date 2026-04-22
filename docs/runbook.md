@@ -33,6 +33,15 @@ bash scripts/deploy-preflight.sh
 `ARTIFACT_STRATEGY` is an operator decision for first-install package access:
 `controlled-outbound`, `s3-artifacts`, or `prebaked-ami`.
 
+### First-deploy execution log
+
+Append to this table as each deployment step is completed. Do not record secret
+values here; record only the action and verification result.
+
+| Date | Step | Action | Result |
+|------|------|--------|--------|
+| 2026-04-22 | Vault setup | Created `infra/ansible/group_vars/all/vault.yml` from the example, filled production values, encrypted it with `ansible-vault`, and set the same password in GitHub secret `ANSIBLE_VAULT_PASSWORD`. | `vault.yml` begins with `$ANSIBLE_VAULT;1.1;AES256`, is not gitignored, GitHub secret exists, and commit `8b8454e` added the encrypted vault. |
+
 **Step 1 — Confirm pre-existing AWS resources**
 
 The S3 state bucket (`achille-tf-state`), DynamoDB lock table
