@@ -105,7 +105,7 @@ export function ClientForm({ onClose, onCreated }: Props) {
         <div className="grid grid-cols-1 gap-4 px-6 py-5 md:grid-cols-2">
           <Field label="Name" required>
             <input
-              className="input"
+              className="block w-full rounded-md border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -114,7 +114,7 @@ export function ClientForm({ onClose, onCreated }: Props) {
           </Field>
           <Field label="Company" required>
             <input
-              className="input"
+              className="block w-full rounded-md border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               required
@@ -123,7 +123,7 @@ export function ClientForm({ onClose, onCreated }: Props) {
           <Field label="Email" required>
             <input
               type="email"
-              className="input"
+              className="block w-full rounded-md border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -132,7 +132,7 @@ export function ClientForm({ onClose, onCreated }: Props) {
           <Field label="Phone" hint="Optional">
             <input
               type="tel"
-              className="input"
+              className="block w-full rounded-md border-0 py-2 px-3 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 text-sm"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />

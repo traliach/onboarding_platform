@@ -172,9 +172,10 @@ Full breakdown with upgrade-path pricing in [`docs/cost.md`](./docs/cost.md).
 
 ## Observability
 
-- **Prometheus** scrapes `node_exporter` on all 5 EC2s plus the server's
-  `/metrics` endpoint (app + worker counters/gauges/histograms). Scrape
-  interval 15 s, retention 15 days.
+- **Prometheus** scrapes `node_exporter` on all 5 EC2s plus the API's
+  `/metrics` endpoint. BullMQ queue counts (waiting, active, completed,
+  failed) are polled from Redis every 30 s by the API process and exposed
+  as gauges. Scrape interval 15 s, retention 15 days.
 - **Grafana** provisions two dashboards as code:
   `monitoring/grafana/dashboards/fleet-overview.json` and
   `onboarding-jobs.json`. Both are committed; there is no click-to-edit

@@ -250,7 +250,7 @@ function StatCard({
   valueClass: string;
 }) {
   return (
-    <div className={`card flex items-center justify-between p-4 ${accent}`}>
+    <div className={`rounded-lg bg-white shadow-sm ring-1 ring-slate-200 flex items-center justify-between p-4 ${accent}`}>
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </div>

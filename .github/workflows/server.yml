@@ -31,11 +31,13 @@ on:
   pull_request:
     paths:
       - "server/**"
+      - "client/src/types/**"
       - ".github/workflows/server.yml"
   push:
     branches: [main]
     paths:
       - "server/**"
+      - "client/src/types/**"
       - ".github/workflows/server.yml"
 
 # Cancel in-flight runs when a new commit lands on the same PR/branch.

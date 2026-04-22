@@ -29,10 +29,10 @@ groups:
           description: "BullMQ has {{ $value }} pending jobs — threshold is 50"
 
       - alert: JobFailureRate
-        expr: increase(bullmq_jobs_failed_total[10m]) > 5
+        expr: bullmq_jobs_failed > 5
         for: 0m
         labels:
           severity: warning
         annotations:
-          summary: "Job failure rate elevated"
-          description: "{{ $value }} jobs have failed in the last 10 minutes"
+          summary: "Job failure count elevated"
+          description: "{{ $value }} jobs are currently in the failed state (threshold: 5)"

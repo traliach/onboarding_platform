@@ -30,7 +30,6 @@ import IORedis from 'ioredis';
 
 import type { AppConfig } from '../config';
 import type { Logger } from '../logger';
-import { bullmqJobsCompleted, bullmqJobsFailed } from '../metrics';
 
 export interface JobPayload {
   readonly jobId: string;
@@ -38,9 +37,17 @@ export interface JobPayload {
 
 export type JobProcessor = (job: BullJob<JobPayload>) => Promise<void>;
 
+export interface QueueCounts {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+}
+
 export interface JobQueue {
   enqueueJob(jobId: string): Promise<void>;
   getWaitingCount(): Promise<number>;
+  getJobCounts(): Promise<QueueCounts>;
   close(): Promise<void>;
 }
 
@@ -82,6 +89,15 @@ export function createQueue(
     getWaitingCount(): Promise<number> {
       return queue.getWaitingCount();
     },
+    async getJobCounts(): Promise<QueueCounts> {
+      const [waiting, active, completed, failed] = await Promise.all([
+        queue.getWaitingCount(),
+        queue.getActiveCount(),
+        queue.getCompletedCount(),
+        queue.getFailedCount(),
+      ]);
+      return { waiting, active, completed, failed };
+    },
     async close(): Promise<void> {
       await queue.close();
       await connection.quit();
@@ -107,14 +123,12 @@ export function createWorker(
   });
 
   worker.on('completed', (bullJob: BullJob<JobPayload>) => {
-    bullmqJobsCompleted.inc();
     logger.info('queue job completed', {
       bull_id: bullJob.id,
       job_id: bullJob.data.jobId,
     });
   });
   worker.on('failed', (bullJob: BullJob<JobPayload> | undefined, err: Error) => {
-    bullmqJobsFailed.inc();
     logger.error('queue job failed', {
       bull_id: bullJob?.id,
       job_id: bullJob?.data.jobId,

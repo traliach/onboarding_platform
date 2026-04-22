@@ -51,6 +51,14 @@ resource "aws_security_group" "app" {
     security_groups = [aws_security_group.monitoring.id]
   }
 
+  ingress {
+    description     = "API metrics from Prometheus"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
+  }
+
   egress {
     description = "Outbound (ECR, SSM, DB, Redis)"
     from_port   = 0
