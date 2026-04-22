@@ -109,7 +109,7 @@ function buildFakeDb(opts: {
     if (/UPDATE invite_tokens SET used = true/i.test(q)) {
       const id = params?.[0] as string;
       const invite = allInvites().find((i) => i.id === id);
-      if (invite) invite.used = true;
+      if (invite) { invite.used = true; }
       return Promise.resolve(emptyResult([] as unknown as R[]));
     }
 
@@ -132,7 +132,7 @@ function buildFakeDb(opts: {
   };
 }
 
-async function buildApp(config: AppConfig, db: Db) {
+function buildApp(config: AppConfig, db: Db) {
   const logger = silentLogger();
   const app = express();
   app.use(cookieParser());
@@ -155,7 +155,7 @@ describe('POST /auth/invite', () => {
     const db = buildFakeDb({
       users: [{ id: ADMIN_ID, email: ADMIN_EMAIL, password_hash: adminHash, created_at: new Date() }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
     const cookie = makeAdminCookie(config);
 
     const res = await request(app)
@@ -172,7 +172,7 @@ describe('POST /auth/invite', () => {
 
   it('returns 401 without JWT cookie', async () => {
     const db = buildFakeDb({});
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post('/auth/invite')
@@ -186,7 +186,7 @@ describe('POST /auth/invite', () => {
     const db = buildFakeDb({
       users: [{ id: ADMIN_ID, email: ADMIN_EMAIL, password_hash: adminHash, created_at: new Date() }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
     const cookie = makeAdminCookie(config);
 
     const res = await request(app)
@@ -205,7 +205,7 @@ describe('POST /auth/invite', () => {
         { id: 'existing-id', email: INVITE_EMAIL, created_at: new Date() },
       ],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
     const cookie = makeAdminCookie(config);
 
     const res = await request(app)
@@ -228,7 +228,7 @@ describe('GET /auth/invite/:token', () => {
         created_by: ADMIN_ID, created_at: new Date(),
       }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app).get(`/auth/invite/${INVITE_TOKEN}`);
 
@@ -240,7 +240,7 @@ describe('GET /auth/invite/:token', () => {
 
   it('returns 404 for an unknown token', async () => {
     const db = buildFakeDb({});
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app).get('/auth/invite/nonexistent-token');
 
@@ -255,7 +255,7 @@ describe('GET /auth/invite/:token', () => {
         created_by: ADMIN_ID, created_at: new Date(),
       }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app).get(`/auth/invite/${INVITE_TOKEN}`);
 
@@ -274,7 +274,7 @@ describe('POST /auth/register/:token', () => {
         created_by: ADMIN_ID, created_at: new Date(),
       }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post(`/auth/register/${INVITE_TOKEN}`)
@@ -293,7 +293,7 @@ describe('POST /auth/register/:token', () => {
         created_by: ADMIN_ID, created_at: new Date(),
       }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post(`/auth/register/${INVITE_TOKEN}`)
@@ -304,7 +304,7 @@ describe('POST /auth/register/:token', () => {
 
   it('returns 400 when password is missing', async () => {
     const db = buildFakeDb({});
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post(`/auth/register/${INVITE_TOKEN}`)
@@ -315,7 +315,7 @@ describe('POST /auth/register/:token', () => {
 
   it('returns 404 for an invalid token', async () => {
     const db = buildFakeDb({});
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post('/auth/register/bad-token')
@@ -333,7 +333,7 @@ describe('POST /auth/register/:token', () => {
         created_by: ADMIN_ID, created_at: new Date(),
       }],
     });
-    const app = await buildApp(config, db);
+    const app = buildApp(config, db);
 
     const res = await request(app)
       .post(`/auth/register/${INVITE_TOKEN}`)

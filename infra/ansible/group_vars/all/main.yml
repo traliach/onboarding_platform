@@ -5,6 +5,13 @@
 onboarding_platform_db_name: onboarding
 onboarding_platform_db_user: onboarding
 
+# Frontend origin — set to the deployed Vercel URL before running Ansible.
+# Used by PORTAL_BASE_URL (welcome email links) and CORS_ALLOWED_ORIGINS.
+# Override at deploy time: ansible-playbook ... -e "onboarding_platform_frontend_origin=https://..."
+onboarding_platform_frontend_origin: "https://CHANGE_ME.vercel.app"
+onboarding_platform_portal_base_url: "{{ onboarding_platform_frontend_origin }}/portal"
+onboarding_platform_cors_origins: "{{ onboarding_platform_frontend_origin }}"
+
 # Node exporter — pinned version (amd64 AL2023 fleet)
 node_exporter_version: "1.8.2"
 

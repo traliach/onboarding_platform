@@ -58,16 +58,16 @@ interface UserRow {
 }
 
 function parseInviteBody(body: unknown): InviteRequest | null {
-  if (typeof body !== 'object' || body === null) return null;
+  if (typeof body !== 'object' || body === null) { return null; }
   const { email } = body as Record<string, unknown>;
-  if (typeof email !== 'string' || email.trim().length === 0) return null;
+  if (typeof email !== 'string' || email.trim().length === 0) { return null; }
   return { email: email.trim().toLowerCase() };
 }
 
 function parseRegisterBody(body: unknown): RegisterRequest | null {
-  if (typeof body !== 'object' || body === null) return null;
+  if (typeof body !== 'object' || body === null) { return null; }
   const { password } = body as Record<string, unknown>;
-  if (typeof password !== 'string' || password.length === 0) return null;
+  if (typeof password !== 'string' || password.length === 0) { return null; }
   return { password };
 }
 
@@ -103,7 +103,7 @@ export function createInviteRouter(
          RETURNING id, token, email, expires_at`,
         [parsed.email, req.user!.id],
       );
-      const row = result.rows[0]!;
+      const row = result.rows[0];
 
       logger.info('invite.created', {
         token: row.token,
@@ -191,7 +191,7 @@ export function createInviteRouter(
            RETURNING id, email, created_at`,
           [invite.email, passwordHash],
         );
-        const row = insertResult.rows[0]!;
+        const row = insertResult.rows[0];
         newUser = {
           id: row.id,
           email: row.email,

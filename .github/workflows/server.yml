@@ -164,13 +164,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Build image tag
+        id: tag
+        # DATE-SHORTSHA-MSG format per CLAUDE.md §5. `main` is the stable
+        # pointer that infra.yml uses; the versioned tag is for rollback.
+        run: |
+          DATE=$(date +%Y%m%d)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          MSG=$(git log -1 --pretty=format:"%s" | tr ' ' '-' | tr -cd '[:alnum:]-' | cut -c1-30)
+          VERSIONED="${DATE}-${SHORT_SHA}-${MSG}"
+          REGISTRY="${{ steps.ecr-login.outputs.registry }}/onboarding-platform"
+          echo "versioned=${REGISTRY}:${VERSIONED}" >> "$GITHUB_OUTPUT"
+          echo "main=${REGISTRY}:main"               >> "$GITHUB_OUTPUT"
+          echo "Tag: ${VERSIONED}"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: server/Dockerfile
           push: true
-          tags: ${{ steps.ecr-login.outputs.registry }}/onboarding-platform:${{ github.sha }}
+          tags: |
+            ${{ steps.tag.outputs.versioned }}
+            ${{ steps.tag.outputs.main }}
           # Reuse layers cached by the docker job that ran in parallel.
           cache-from: type=gha
           cache-to: type=gha,mode=max
