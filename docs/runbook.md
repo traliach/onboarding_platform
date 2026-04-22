@@ -52,6 +52,7 @@ values here; record only the action and verification result.
 | Date | Step | Action | Result |
 |------|------|--------|--------|
 | 2026-04-22 | Vault setup | Created `infra/ansible/group_vars/all/vault.yml` from the example, filled production values, encrypted it with `ansible-vault`, and set the same password in GitHub secret `ANSIBLE_VAULT_PASSWORD`. | `vault.yml` begins with `$ANSIBLE_VAULT;1.1;AES256`, is not gitignored, GitHub secret exists, and commit `8b8454e` added the encrypted vault. |
+| 2026-04-22 | Smoke preflight | Ran `ARTIFACT_STRATEGY=controlled-outbound bash scripts/deploy-preflight.sh --phase=smoke` from Git Bash. | Vault checks passed. Blocked on missing Windows Ansible commands, DynamoDB lock table, GitHub OIDC role, ECR repository, and GitHub secrets `AWS_ROLE_TO_ASSUME` / `AWS_REGION`. HTTPS/Vercel checks correctly skipped for smoke phase. |
 
 **Step 1 — Confirm pre-existing AWS resources**
 
