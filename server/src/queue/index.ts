@@ -30,6 +30,7 @@ import IORedis from 'ioredis';
 
 import type { AppConfig } from '../config';
 import type { Logger } from '../logger';
+import { bullmqJobsCompleted, bullmqJobsFailed } from '../metrics';
 
 export interface JobPayload {
   readonly jobId: string;
@@ -102,12 +103,14 @@ export function createWorker(
   });
 
   worker.on('completed', (bullJob: BullJob<JobPayload>) => {
+    bullmqJobsCompleted.inc();
     logger.info('queue job completed', {
       bull_id: bullJob.id,
       job_id: bullJob.data.jobId,
     });
   });
   worker.on('failed', (bullJob: BullJob<JobPayload> | undefined, err: Error) => {
+    bullmqJobsFailed.inc();
     logger.error('queue job failed', {
       bull_id: bullJob?.id,
       job_id: bullJob?.data.jobId,

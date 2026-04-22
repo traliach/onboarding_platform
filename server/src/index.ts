@@ -35,6 +35,7 @@ import { createInviteRouter } from './api/invite';
 import { createJobsRouter } from './api/jobs';
 import { createPortalRouter } from './api/portal';
 import { loadConfig, ConfigValidationError, type AppConfig } from './config';
+import { register } from './metrics';
 import { createDb, type Db } from './db/pool';
 import { createRootLogger, type Logger } from './logger';
 import {
@@ -174,6 +175,12 @@ function startApi(
       logger.warn('readiness check failed', { error: describeError(err) });
       res.status(503).json({ status: 'not_ready', target: config.appTarget });
     }
+  });
+
+  // Public — scraped by Prometheus on the same port as the API.
+  app.get('/metrics', async (_req: Request, res: Response) => {
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
   });
 
   app.use('/auth', createAuthRouter(config, db, logger));
