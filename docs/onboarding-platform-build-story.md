@@ -126,8 +126,9 @@ Ansible's `prometheus` and `grafana` roles deploy from the repo on every
 `infra.yml` run. A dashboard edit is a PR, not an SSH session.
 
 Instrumented the Express API with `prom-client`: default Node.js metrics
-plus BullMQ counters (`bullmq_jobs_completed_total`, `bullmq_jobs_failed_total`,
-`bullmq_queue_depth`) exposed on `GET /metrics` at :3000.
+plus BullMQ gauges (`bullmq_queue_depth`, `bullmq_jobs_active`,
+`bullmq_jobs_completed`, `bullmq_jobs_failed`) polled from Redis every 30 s
+and exposed on `GET /metrics` at :3000.
 
 **Result:**
 - `git log monitoring/` is the full history of every observability change.
@@ -212,3 +213,93 @@ adds `id-token: write` and `pull-requests: write`.
   identity to exploit.
 - Image tags are traceable: `20260420-a3f9c2b-add-jwt-auth` is unambiguous;
   `:latest` and `:main` are not.
+
+---
+
+## Chapter 7 — BullMQ counters the scraper could never read
+
+**Situation:**
+The platform has a worker process (BullMQ consumer on the worker EC2) and an
+API process (Express on the app EC2). Both import the same `server/src/metrics.ts`
+module, which registered two prom-client Counters:
+`bullmq_jobs_completed_total` and `bullmq_jobs_failed_total`. The worker
+incremented them on `completed` and `failed` BullMQ events. The API exposed
+`GET /metrics` using the same shared Registry. On paper it looked wired up.
+
+**Task:**
+During a review pass, confirm that Prometheus was actually receiving BullMQ
+metrics — not just that the code compiled and the endpoint responded.
+
+**Action:**
+Two separate failures surfaced, one at the network layer and one at the process
+model layer.
+
+**Failure 1 — the security group was wrong:**
+The app EC2's security group allowed port 3000 inbound only from the ALB
+security group. Prometheus runs on the monitoring EC2, which is in a different
+security group. There was no ingress rule allowing the monitoring SG to reach
+port 3000 on the app SG. Prometheus would have connected and timed out — the
+scrape target would show as `DOWN` for a reason that had nothing to do with the
+application code.
+
+Fix: added a second ingress rule to `aws_security_group.app` — TCP 3000 from
+`aws_security_group.monitoring.id`, description "API metrics from Prometheus".
+Scoped to the monitoring SG only, not the VPC CIDR.
+
+**Failure 2 — the counters lived in the wrong process:**
+prom-client metrics are in-process state. The worker increments
+`bullmq_jobs_completed_total` inside the worker process's Registry. The API
+exposes `/metrics` from the API process's Registry. These are two separate
+OS processes on two separate EC2s — they share no memory. The API's Registry
+had those counters registered (because it imports the same module) but they
+were always at zero, because the API never processes jobs and never increments
+them. Prometheus scrapes the API. The worker's counters are never scraped at all.
+
+The initial code passed typecheck and linting cleanly, the endpoint returned
+valid Prometheus text, and the dashboard would have loaded without error —
+showing a flat zero line for two metrics that appeared to be working.
+
+Fix: removed the counters entirely. Added `getJobCounts()` to the `JobQueue`
+interface: a single method that calls `queue.getWaitingCount()`,
+`getActiveCount()`, `getCompletedCount()`, and `getFailedCount()` in parallel
+against Redis. The API polls this every 30 seconds in `main()` and writes the
+results into four Gauges (`bullmq_queue_depth`, `bullmq_jobs_active`,
+`bullmq_jobs_completed`, `bullmq_jobs_failed`). The API is the only process
+that talks to Redis as a producer — it already owns the queue connection —
+so this adds no new dependency.
+
+**What didn't work:**
+The alternative was to give the worker its own HTTP server on a separate port
+(e.g. :9102) and add a second Prometheus scrape job targeting the worker EC2.
+This would have required: a new ingress rule on the worker SG, a new `job`
+block in `prometheus.yml`, and a second `app.listen()` in the worker entry
+point. It also would have produced two separate metric endpoints that had to
+be correlated in Grafana. More surface, more config, harder to reason about.
+
+The API-polls-Redis approach consolidates everything into the one endpoint
+Prometheus already scrapes, adds no new ports, and the polling cost (four
+Redis commands every 30 s) is negligible on a t2.micro.
+
+**What also needed fixing as a consequence:**
+- `alerts.yml`: `JobFailureRate` used `increase(bullmq_jobs_failed_total[10m]) > 5`.
+  A gauge does not accumulate monotonically, so `increase()` is not valid.
+  Changed to `bullmq_jobs_failed > 5` — a threshold on the current failed-state
+  count, which is what the alert was always trying to express.
+- `onboarding-jobs.json`: the Grafana dashboard referenced four metric names
+  (`bullmq_pending_jobs_total`, `bullmq_active_jobs_total`, etc.) that were
+  never emitted. The HTTP Request Duration panel used
+  `http_request_duration_seconds_bucket`, which requires a Histogram that was
+  never instrumented. All panels were updated to use the actual emitted names;
+  the HTTP latency panel was removed.
+
+**Result:**
+- Prometheus can reach `/metrics` on port 3000 (security group fixed).
+- All four BullMQ queue counts are scraped from a single endpoint, from a
+  single process, with no worker HTTP server.
+- `JobFailureRate` fires on a meaningful condition — current failed-job count
+  above threshold — rather than a `increase()` expression over a metric that
+  was permanently zero.
+- The Grafana dashboard loads without "No data" panels.
+- The lesson: a metric that is registered, incremented, and exposed at
+  compile time can still be invisible to Prometheus at runtime if the topology
+  is wrong. Code review is not enough — you have to trace the scrape path.
