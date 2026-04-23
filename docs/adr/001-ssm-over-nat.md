@@ -12,7 +12,7 @@ instance**. Private EC2s still need:
 2. The ability to pull Docker images from ECR (the API and worker image).
 3. Access to Amazon Linux 2023 package repositories for `dnf` updates.
 
-The platform runs on a $47/month budget (CLAUDE.md section 8). A managed NAT
+The platform runs on a $47/month budget (project rules section 8). A managed NAT
 gateway is ~$33/month on its own (`$0.045/hour` + data processing), which
 alone is ~70% of the total budget.
 
@@ -32,7 +32,7 @@ Endpoints created by `infra/terraform/modules/ssm/`:
 | `com.amazonaws.<region>.s3` | Gateway | ECR layer blobs + `dnf` mirrors |
 
 Shell access to every private EC2 is via **SSM Session Manager** (not SSH).
-Port 22 is closed in every security group (CLAUDE.md section 9).
+Port 22 is closed in every security group (project rules section 9).
 
 ## Rationale
 - **Cost.** VPC interface endpoints cost ~$0.01/hour per endpoint per AZ
@@ -50,7 +50,7 @@ Port 22 is closed in every security group (CLAUDE.md section 9).
   security group from the attack surface.
 - **Portfolio signal.** Running a private fleet with zero NAT and zero
   bastion demonstrates senior-level AWS networking fluency and cost
-  discipline. Explicitly called out in CLAUDE.md section 17 as a
+  discipline. Explicitly called out in project rules section 17 as a
   non-negotiable portfolio decision.
 
 ## Alternatives considered
@@ -62,7 +62,7 @@ Port 22 is closed in every security group (CLAUDE.md section 9).
   unrestricted egress.
 - **Bastion EC2 + SSH keys** — rejected. Extra instance, extra key material
   to manage, port 22 exposed somewhere, auditability weaker than SSM.
-- **Public IPs on all EC2s** — rejected outright. Violates CLAUDE.md
+- **Public IPs on all EC2s** — rejected outright. Violates project rules
   section 9 ("No EC2 has a public IP").
 
 ## Consequences
@@ -73,8 +73,8 @@ Port 22 is closed in every security group (CLAUDE.md section 9).
 - Private route table has **no** `0.0.0.0/0` route. Any attempt to `curl`
   an arbitrary URL from a private EC2 will fail, by design.
 - Ansible reaches the private EC2s through SSM (`ansible-playbook -c
-  community.aws.aws_ssm ...`) — see `docs/runbook.md` (Phase 6) for the
-  target syntax.
+  community.aws.aws_ssm ...`) — see `docs/deploy.md` for deploy-time
+  commands and `docs/runbook.md` for operational access.
 - If we ever move to multi-AZ compute, each interface endpoint needs an
   additional ENI in the second AZ — that cost must be added to the upgrade
   path section of `docs/architecture.md`.

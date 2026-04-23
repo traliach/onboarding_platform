@@ -19,6 +19,8 @@ coverage/
 **/.terraform/
 *.tfstate
 *.tfstate.backup
+*.tfplan
+**/tfplan
 *.tfvars
 !*.tfvars.example
 .terraform.lock.hcl
@@ -53,10 +55,10 @@ CLAUDE.md
 prompt.MD
 docs/Onboarding platform build story.MD
 docs/onboarding-platform-build-story.md
-docs/deploy.md
 
 # Transient curl / dev artifacts
 cookies.txt
+.deploy-tmp/
 
 # Ansible — encrypted vault.yml is intentionally committed so infra.yml can
 # decrypt it with ANSIBLE_VAULT_PASSWORD. Ignore plaintext scratch files,
