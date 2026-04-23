@@ -19,7 +19,7 @@ variable "instance_type" {
 }
 
 variable "ebs_volume_size" {
-  description = "Root EBS volume size (GiB)."
+  description = "Root EBS volume size (GiB). Must be at least the selected AMI root snapshot size."
   type        = number
 }
 

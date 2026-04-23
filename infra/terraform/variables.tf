@@ -40,15 +40,20 @@ variable "private_subnet_cidr" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for the entire fleet. t2.micro per CLAUDE.md cost rules."
+  description = "EC2 instance type for the entire fleet. Defaults to t2.micro for the lab cost target."
   type        = string
   default     = "t2.micro"
 }
 
 variable "ebs_volume_size" {
-  description = "Root EBS volume size (GiB) for each EC2. gp3 is mandated."
+  description = "Root EBS volume size (GiB) for each EC2. AL2023 currently requires at least 30 GiB; gp3 is mandated."
   type        = number
-  default     = 20
+  default     = 30
+
+  validation {
+    condition     = var.ebs_volume_size >= 30
+    error_message = "ebs_volume_size must be at least 30 GiB for the current Amazon Linux 2023 root snapshot."
+  }
 }
 
 variable "allowed_http_cidrs" {

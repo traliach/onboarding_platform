@@ -9,14 +9,14 @@ endpoints. It uses a pre-existing S3 backend and DynamoDB lock table.
 - Terraform ≥ 1.5
 - AWS credentials resolvable via a named profile — set `AWS_PROFILE`
   in your shell. `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in a
-  `.env` file is forbidden (CLAUDE.md §10).
+  `.env` file is forbidden (project rules §10).
 - A default region (`us-east-1`) — matched in `variables.tf` and the
   `backend "s3"` block in `versions.tf`.
 
 ## First-time setup (new AWS account)
 
 Before `terraform init`, create or confirm the account prerequisites described
-in `docs/runbook.md`: S3 state bucket, DynamoDB lock table, ECR repository, and
+in `docs/deploy.md`: S3 state bucket, DynamoDB lock table, ECR repository, and
 GitHub OIDC role. They are intentionally outside this root module so app
 teardown cannot destroy the state backend or CI identity.
 
@@ -68,7 +68,7 @@ using that ACM certificate.
 - `vpc_id` / `region` — echoed for downstream tooling.
 
 The Ansible inventory is generated from these outputs, never
-hand-edited (CLAUDE.md §5 "Ansible"). After `terraform apply`, push the
+hand-edited (project rules §5 "Ansible"). After `terraform apply`, push the
 server image to ECR, run `../ansible/scripts/render-inventory.sh`, then
 `ansible-playbook ../ansible/playbooks/site.yml` — see `../ansible/README.md`.
 
@@ -80,7 +80,7 @@ terraform destroy   # tears down the fleet
 ```
 
 The DB EC2 and its EBS volume are protected by `prevent_destroy = true`
-(CLAUDE.md §5). To actually destroy them, remove the lifecycle block
+(project rules §5). To actually destroy them, remove the lifecycle block
 temporarily — do not amend the root module in a PR that claims to be
 a refactor.
 

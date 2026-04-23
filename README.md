@@ -47,11 +47,11 @@ surface, and the infrastructure story, not the integrations themselves.
 | Backend | **Complete.** API, worker, dual auth (JWT + UUID token), analytics, tier-based step registry, retry endpoint, Docker image, 45-test suite. |
 | Frontend | **Complete.** Dashboard (clients + analytics tabs), portal page, login, client detail with live step polling and retry UI. Deployed to Vercel free tier. |
 | Local stack | **Complete.** `docker compose up` starts the full backend in one command. |
-| Terraform | **Complete.** VPC, security groups (per-tier SG segmentation), 5 × t2.micro EC2s, ALB, SSM VPC endpoints, S3 remote state + DynamoDB locking, GitHub OIDC role. |
+| Terraform | **Complete.** VPC, security groups (per-tier SG segmentation), 5 × t2.micro EC2s, ALB, SSM VPC endpoints, and the EC2 SSM/ECR instance role. S3 remote state, DynamoDB locking, ECR, and the GitHub OIDC role are account prerequisites created outside the app root. |
 | Ansible | **Complete.** Six idempotent roles (common, db, worker, app, prometheus, grafana) run in order by a single master playbook over SSM. |
 | Monitoring | **Complete.** `monitoring/` holds Prometheus scrape config + 4 alert rules + 2 provisioned Grafana dashboards. Ansible deploys from the repo — nothing is hand-configured on the EC2. |
 | CI/CD | **Complete.** Three path-scoped workflows. `server.yml` builds + pushes to ECR on main. `infra.yml` runs `terraform apply` + Ansible + ALB smoke test on merge. |
-| Docs | **Complete.** 10 ADRs, `cost.md`, `architecture.md`, `runbook.md`. |
+| Docs | **Complete.** 10 ADRs, `cost.md`, `architecture.md`, `deploy.md`, `runbook.md`. |
 
 Built commit-by-commit with plain-English messages — `git log --oneline` is
 the change history.
@@ -146,7 +146,7 @@ Target: **~$47/month** end-to-end (AWS fleet + Vercel frontend).
 | Resource                  | Spec                  | Monthly  |
 |---------------------------|-----------------------|----------|
 | 5 × t2.micro EC2          | app/worker/db/prom/graf | $42.35 |
-| EBS (5 × 20 GiB gp3)      | $0.08/GiB             | $8.00    |
+| EBS (5 × 30 GiB gp3)      | $0.08/GiB             | $12.00   |
 | ALB                       | $0.0225/hr + LCUs     | $4.50    |
 | Data transfer             | Intra-AZ free         | ~$1.00   |
 | Frontend (Vercel)         | Free tier             | $0.00    |
@@ -207,14 +207,15 @@ AWS authentication is OIDC — no static access keys in GitHub secrets.
 client/         React 19 + Vite + Tailwind — dashboard + portal
 server/         Node.js + TypeScript — Express API, BullMQ worker, Docker image
 infra/
-  terraform/    VPC, security groups, 5 × EC2, ALB, SSM endpoints
+  terraform/    VPC, security groups, 5 × EC2, ALB, SSM endpoints, EC2 IAM role
   ansible/      six idempotent roles, master playbook, vault-encrypted secrets
 monitoring/     Prometheus config + alert rules + Grafana dashboard JSON
-scripts/        render-inventory.sh — Terraform outputs → Ansible hosts.yml
+scripts/        deploy-preflight.sh checks deploy readiness; render-inventory.sh writes Ansible hosts.yml
 docs/
   adr/          001–010 Architecture Decision Records
   architecture.md  tier diagram, SG matrix, data flow
-  runbook.md       deploy, teardown, SSM shell, Ansible per-host
+  deploy.md        first deploy, preflight, CI/CD handoff
+  runbook.md       alerts, triage, SSM shell, teardown
   cost.md          full $47/month breakdown
 .github/workflows/  client.yml, server.yml, infra.yml
 docker-compose.yml  local backend: postgres, redis, api, worker
