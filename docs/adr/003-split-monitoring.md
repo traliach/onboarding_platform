@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-The fleet (CLAUDE.md section 3) includes an observability tier composed of
+The fleet (project rules section 3) includes an observability tier composed of
 two services: **Prometheus** (TSDB + scrape engine) and **Grafana**
 (dashboards + alert UI). Both could plausibly run on one host. The question
 is whether to co-locate them on a single instance or split them onto two.
@@ -79,7 +79,7 @@ reached through the ALB (section 3).
 ## Consequences
 - Two `t2.micro` instances appear in `infra/terraform/modules/compute/`
   rather than one. The Ansible inventory has distinct `prometheus` and
-  `grafana` groups (CLAUDE.md section 3).
+  `grafana` groups (project rules section 3).
 - Two security groups: `prometheus-sg` allows inbound 9090 only from
   `grafana-sg`; `grafana-sg` allows inbound 3000 only from the ALB. Neither
   allows inbound from the VPC CIDR at large.

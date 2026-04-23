@@ -1,5 +1,5 @@
 /**
- * Authentication endpoints for the internal dashboard (CLAUDE.md §10).
+ * Authentication endpoints for the internal dashboard (project rules §10).
  *
  * Surface:
  *   POST /auth/login   { email, password }

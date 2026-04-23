@@ -18,7 +18,7 @@ node_exporter_version: "1.8.2"
 # Prometheus — pinned binary version
 prometheus_version: "2.53.1"
 
-# PostgreSQL tuning — ADR-004 / CLAUDE.md §6 (1 GiB RAM)
+# PostgreSQL tuning — ADR-004 / project rules §6 (1 GiB RAM)
 postgres_shared_buffers: "128MB"
 postgres_work_mem: "4MB"
 postgres_max_connections: 20

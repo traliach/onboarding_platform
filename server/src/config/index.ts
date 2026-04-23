@@ -7,7 +7,7 @@
  * in the rest of the codebase. Import the frozen `AppConfig` value returned
  * by `loadConfig()` and pass it down explicitly.
  *
- * Validation rules come directly from CLAUDE.md sections 6 and 10.
+ * Validation rules come directly from project rules sections 6 and 10.
  */
 
 export type NodeEnv = 'development' | 'test' | 'production';

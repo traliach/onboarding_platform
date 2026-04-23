@@ -4,7 +4,7 @@
  * The JWT itself lives in an httpOnly cookie the browser attaches to every
  * request; this context only tracks whether we *have* a session and who
  * the user is. Never stores the token itself — that is forbidden by
- * CLAUDE.md section 10.
+ * project rules section 10.
  *
  * State machine:
  *   unknown  → on mount, call GET /auth/me to probe the cookie.

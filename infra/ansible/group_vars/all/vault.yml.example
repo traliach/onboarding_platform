@@ -5,7 +5,7 @@
 # vault.yml from git and ANSIBLE_VAULT_PASSWORD from GitHub secrets.
 # Plaintext scratch copies such as vault.plain.yml stay gitignored.
 #
-# CLAUDE.md §5: every key is prefixed `onboarding_platform_`. No
+# project rules §5: every key is prefixed `onboarding_platform_`. No
 # company, client, or person identifiers.
 #
 # To set up locally:
@@ -25,7 +25,7 @@
 onboarding_platform_db_password: "CHANGE_ME_BEFORE_ENCRYPTING"
 
 # Used by the server's JWT middleware. Minimum 32 random characters
-# (CLAUDE.md §10). Rotating this invalidates every issued JWT —
+# (project rules §10). Rotating this invalidates every issued JWT —
 # acceptable for a forced logout, not for a routine config change.
 onboarding_platform_jwt_secret: "CHANGE_ME_BEFORE_ENCRYPTING"
 

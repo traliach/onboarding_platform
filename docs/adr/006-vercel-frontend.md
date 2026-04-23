@@ -14,7 +14,7 @@ The project has two tiers that could host the `client/` React + Vite build:
 
 The project is browser-only at the frontend (no SSR requirement today) and
 the API is already on its own host exposed via ALB over HTTPS. CORS is
-already a first-class concern (CLAUDE.md section 10: explicit origin list,
+already a first-class concern (project rules section 10: explicit origin list,
 no wildcards). Adding a separate frontend origin is not additional
 complexity — it is already priced in.
 
@@ -51,7 +51,7 @@ no wildcard — via the `CORS_ALLOWED_ORIGINS` environment variable that
   platforms (Vercel, Cloudflare, Netlify) while the API stays on cloud IaaS.
   The project models that split honestly.
 - **Deploy is a `git push`.** The `client.yml` workflow
-  (CLAUDE.md section 3) just builds and lets Vercel's Git integration
+  (project rules section 3) just builds and lets Vercel's Git integration
   deploy. The workflow itself has almost nothing to do — lint, test,
   `vite build`, done. The AWS fleet deploy is where the interesting
   infra work lives; the frontend should not compete for that attention.

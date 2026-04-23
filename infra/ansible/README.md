@@ -1,7 +1,7 @@
 # Ansible — `infra/ansible/`
 
 Configures the five-EC2 fleet **after** Terraform has created it. Connection is
-**SSM Session Manager** only — port 22 is closed on every instance (CLAUDE.md §5).
+**SSM Session Manager** only — port 22 is closed on every instance (project rules §5).
 
 ## Prerequisites (controller laptop or CI runner)
 

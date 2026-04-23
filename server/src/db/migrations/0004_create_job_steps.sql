@@ -2,7 +2,7 @@
 -- Fine-grained provisioning steps. The seven valid step_name values are
 -- enumerated in client/src/types/index.ts (StepName type). plain_label is
 -- the client-facing text rendered on the public portal; internal names
--- like 'createIamUser' must never leak (CLAUDE.md section 10).
+-- like 'createIamUser' must never leak (project rules section 10).
 --
 -- log_message carries the short human-readable outcome on success,
 -- error_message carries the failure detail for the admin retry UI. Both

@@ -1,7 +1,7 @@
 /**
  * Portal — public, unauthenticated view of one client's progress.
  *
- * Security posture (CLAUDE.md §10): this page is the only place the
+ * Security posture (project rules §10): this page is the only place the
  * unauthenticated internet reaches the backend. The server's /portal
  * handler deliberately scopes the response to a single client and omits
  * step_name, internal IDs, error_message, audit log, and anything else

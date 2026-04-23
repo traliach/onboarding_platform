@@ -30,7 +30,7 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 
 locals {
   # Non-DB instances use `for_each`. The DB is a dedicated resource because
-  # `prevent_destroy` is required (CLAUDE.md section 4) and it cannot be
+  # `prevent_destroy` is required (project rules section 4) and it cannot be
   # conditionally set inside a `for_each` lifecycle block.
   non_db_instances = {
     app        = { sg_id = var.app_sg_id }

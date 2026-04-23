@@ -8,7 +8,7 @@ terraform {
     }
   }
 
-  # Remote state — CLAUDE.md §5.
+  # Remote state — project rules §5.
   # Bucket and DynamoDB table are pre-existing (created once via AWS CLI —
   # see docs/runbook.md). The bucket is shared across projects; state is
   # isolated by the key path. Never delete the lock table between deploys.

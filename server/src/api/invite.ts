@@ -1,5 +1,5 @@
 /**
- * Invite-only registration endpoints (CLAUDE.md §6).
+ * Invite-only registration endpoints (project rules §6).
  *
  * Surface:
  *   POST /auth/invite             [JWT required]

@@ -53,7 +53,7 @@ max_connections        = 20
   load, observable on the `HighMemoryUsage` Prometheus alert defined in
   `monitoring/prometheus/alerts.yml`.
 - **Upgrade `db` to t3.small** — rejected. Doubles the DB line to ~$16/month
-  and defeats the "cost-conscious design" signal in CLAUDE.md section 1.
+  and defeats the "cost-conscious design" signal in project rules section 1.
   Keep this as a documented upgrade path when real production traffic arrives.
 - **RDS db.t3.micro** — (managed DB is out of scope) and costs more than self-managed.
 - **PgBouncer in front of Postgres** — deferred. Useful later when real

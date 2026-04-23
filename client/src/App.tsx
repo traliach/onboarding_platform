@@ -1,7 +1,7 @@
 /**
  * App — route definitions.
  *
- * Route map (CLAUDE.md section 3):
+ * Route map (project rules section 3):
  *   /login                public — LoginPage
  *   /register/:token      public — RegisterPage (invite-only registration)
  *   /portal/:token        public — PortalPage

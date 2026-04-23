@@ -1,5 +1,5 @@
 /**
- * JWT cookie → req.user authentication middleware (CLAUDE.md §10).
+ * JWT cookie → req.user authentication middleware (project rules §10).
  *
  * Contract honored here:
  *   - Read the token from the httpOnly cookie set by POST /auth/login. Never

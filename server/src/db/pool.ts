@@ -1,7 +1,7 @@
 /**
  * PostgreSQL connection pool — the only path to the database.
  *
- * Rules (CLAUDE.md section 5 + section 6):
+ * Rules (project rules section 5 + section 6):
  *   - Direct pg driver, no ORM. Queries are raw SQL with $1-style parameters.
  *   - One pool per process. Do not create ad-hoc pools in route handlers.
  *   - Never concatenate user input into SQL. Always pass as params.

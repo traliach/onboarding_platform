@@ -37,7 +37,7 @@ The platform uses token-based flows for both external access (client portal, UUI
 ## Alternatives considered
 - **Open registration** — rejected: no multi-tenancy, every user is full admin, unacceptable risk.
 - **CLI seed script** — rejected: requires SSH/SSM access and manual SQL knowledge from the person doing onboarding. The API path is better guarded and auditable.
-- **OAuth / SSO** — out of scope per CLAUDE.md §17. Token invite is appropriate for a 3–5 person internal team.
+- **OAuth / SSO** — out of scope per project rules §17. Token invite is appropriate for a 3–5 person internal team.
 - **Email delivery (SES/SMTP)** — the copy-link approach is deliberately simpler. Email delivery is the obvious upgrade path once SMTP config exists; no code change needed in the invite endpoint itself.
 
 ## Consequences

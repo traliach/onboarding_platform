@@ -22,7 +22,7 @@ transition to CI:
   with static keys living in the repo settings. Static keys are the
   #1 cause of AWS account compromises in public GitHub data.
 
-The budget is still $47/month (CLAUDE.md §8). Any remote-state
+The budget is still $47/month (project rules §8). Any remote-state
 solution that needs a managed service beyond S3/DynamoDB (Terraform
 Cloud, Spacelift, etc.) is off the table.
 
@@ -103,14 +103,14 @@ to local state.
 | Local state, `.gitignore`d | No sharing; CI has no state; no locking. Worse than current. |
 | Terraform Cloud remote state | Free tier exists, but introduces a third-party dependency and a second credential boundary. The $47 budget has no room for the paid tier, and the free tier is not guaranteed to stay free. |
 | S3 backend, static IAM user with access keys | Solves state but not the credential problem. Long-lived keys in GitHub secrets is exactly the pattern this ADR exists to avoid. |
-| S3 backend, OIDC, Admin-role trust | Violates CLAUDE.md §10 ("never create IAM roles with AdministratorAccess"). |
+| S3 backend, OIDC, Admin-role trust | Violates project rules §10 ("never create IAM roles with AdministratorAccess"). |
 | Two OIDC roles (plan-only + apply-only) | Doubles the IAM surface area for a marginal guard; apply-gating in the workflow is equivalent and reviewable. |
 
 ## References
-- CLAUDE.md §5 (Infrastructure rules) — remote state, credential
+- project rules §5 (Infrastructure rules) — remote state, credential
   handling, naming convention.
-- CLAUDE.md §8 (CI/CD rules) — OIDC secrets and `id-token: write`.
-- CLAUDE.md §10 (Security rules) — OIDC-only, no Admin, no static
+- project rules §8 (CI/CD rules) — OIDC secrets and `id-token: write`.
+- project rules §10 (Security rules) — OIDC-only, no Admin, no static
   keys.
 - `infra/terraform/versions.tf` — the S3 backend configuration.
 - `infra/terraform/README.md` — root module setup and prerequisites.

@@ -1,7 +1,7 @@
 /**
  * Tier → step-sequence contract.
  *
- * These assertions encode the product rules from CLAUDE.md §4 and prevent a
+ * These assertions encode the product rules from project rules §4 and prevent a
  * future edit to the registry from silently changing what a "basic" or
  * "enterprise" client gets provisioned for. Order matters — the worker runs
  * the steps sequentially in the order the registry returns them.

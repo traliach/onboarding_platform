@@ -1,5 +1,5 @@
 /**
- * Development seed script (CLAUDE.md section 12).
+ * Development seed script (project rules section 12).
  *
  * Creates:
  *   - one admin user for the internal dashboard (bcrypt-hashed password)

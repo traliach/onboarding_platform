@@ -1,7 +1,7 @@
 /**
  * JWT sign and verify helpers for the internal dashboard session cookie.
  *
- * CLAUDE.md §10 requires:
+ * project rules §10 requires:
  *   - The JWT is stored in an httpOnly, SameSite=Strict cookie (handled by the
  *     routes that call {@link signToken}; this module only produces the string).
  *   - `JWT_SECRET` is sourced from validated config, never hardcoded.
@@ -13,7 +13,7 @@
  *   - `email`  the user email (for audit/logging without a DB round trip)
  * Any richer user data must be fetched from the `users` table.
  *
- * Token lifetime is fixed at 7 days for now. CLAUDE.md does not mandate a
+ * Token lifetime is fixed at 7 days for now. project rules does not mandate a
  * specific value, so this lives as a constant rather than another env knob —
  * revisit if/when a refresh-token flow is introduced.
  */

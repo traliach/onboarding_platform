@@ -9,7 +9,7 @@
  * Naming convention (enforced by convention, not code):
  *   NNNN_short_description.sql     e.g. 0001_create_clients.sql
  *
- * Rules (CLAUDE.md section 5 + section 6):
+ * Rules (project rules section 5 + section 6):
  *   - Migrations are pure SQL. No JavaScript/TypeScript migrations.
  *   - Migrations are forward-only. There is no `down` path; schema changes
  *     roll forward with corrective migrations in production.

@@ -1,4 +1,4 @@
--- Invite token store for the invite-only registration flow (CLAUDE.md §6).
+-- Invite token store for the invite-only registration flow (project rules §6).
 --
 -- token is separate from id so it can be rotated independently if needed.
 -- created_by references users so audit trails show who sent each invite.

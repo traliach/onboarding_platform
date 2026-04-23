@@ -9,7 +9,7 @@ fleet). Something still has to install PostgreSQL, Redis, Docker images,
 Prometheus, and Grafana, apply the ADR-004 memory tuning, and keep those
 settings reproducible.
 
-SSH is intentionally unavailable (port 22 closed — CLAUDE.md §10). The only
+SSH is intentionally unavailable (port 22 closed — project rules §10). The only
 supported operator access path is SSM Session Manager, so configuration
 management must work over the same transport.
 

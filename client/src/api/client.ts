@@ -5,7 +5,7 @@
  *   - All requests include `credentials: 'include'` so the session cookie
  *     set by POST /auth/login is sent on subsequent calls. Without this
  *     the JWT is useless — the browser simply does not attach the cookie
- *     on cross-origin requests. CLAUDE.md section 10.
+ *     on cross-origin requests. project rules section 10.
  *   - Every response status is mapped to a typed error (errors.ts). UI
  *     code never parses response.status on its own.
  *   - The base URL comes from VITE_API_BASE_URL at build time. Never read

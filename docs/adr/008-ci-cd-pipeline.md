@@ -20,7 +20,7 @@ cadence, a different failure mode, and different secrets. A single
 
 Two more requirements shape this:
 
-1. **No static AWS credentials**, per CLAUDE.md §10 and ADR-007. The
+1. **No static AWS credentials**, per project rules §10 and ADR-007. The
    infra workflow authenticates via OIDC; the client and server
    workflows don't need AWS at all (for now).
 2. **Feature-branch previews**: the Vercel integration (ADR-006)
@@ -120,8 +120,8 @@ lock table, ECR repository, and OIDC role must exist before the workflows run;
 | Applying from a protected long-lived `staging` branch before `main` | Worth doing when there's a staging environment. For a single-environment $47/month lab, a staging branch is ceremony. Revisit when a second AWS account or a non-prod Vercel project lands. |
 
 ## References
-- CLAUDE.md §8 (CI/CD rules) — OIDC secrets, `id-token: write`.
-- CLAUDE.md §10 (Security rules) — no static keys, no Admin roles.
+- project rules §8 (CI/CD rules) — OIDC secrets, `id-token: write`.
+- project rules §10 (Security rules) — no static keys, no Admin roles.
 - ADR-006 — Vercel frontend; explains why `client.yml` does not
   deploy.
 - ADR-007 — Remote state + OIDC; explains where

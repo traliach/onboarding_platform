@@ -20,10 +20,10 @@ one Git history or four.
 
 ## Decision
 **Keep all four concerns in a single monorepo** (this repository).
-Directory layout is the one in CLAUDE.md section 3; each concern is a
+Directory layout is the one in project rules section 3; each concern is a
 top-level folder with its own `package.json` / `terraform` / YAML root.
 
-CI/CD is split by path prefix, not by repository (CLAUDE.md section 16):
+CI/CD is split by path prefix, not by repository (project rules section 16):
 
 - `.github/workflows/client.yml` — triggers on `client/**` changes.
 - `.github/workflows/server.yml` — triggers on `server/**` changes.
@@ -93,7 +93,7 @@ separate repositories.
   `node_modules` — so the Docker build context stays small. Existing
   `.dockerignore` already does this.
 - `git log` becomes the one history for everything. Plain-English commit
-  messages (CLAUDE.md section 12) are the disambiguation: `add adr003
+  messages (project rules section 12) are the disambiguation: `add adr003
   split monitoring` is obviously infra-ish, `add jwt auth middleware` is
   obviously server, `add clientlist progress bars` is obviously client. No
   monorepo prefix convention (`[server] ...`, `[infra] ...`) is imposed

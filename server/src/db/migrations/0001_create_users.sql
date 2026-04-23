@@ -4,7 +4,7 @@
 -- portable to older development installations.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Admin dashboard users (CLAUDE.md section 6). Seeded manually via
+-- Admin dashboard users (project rules section 6). Seeded manually via
 -- `npm run seed`; there is no self-registration endpoint. password_hash
 -- is bcrypt with cost factor >= 12 enforced by the config layer.
 CREATE TABLE users (
