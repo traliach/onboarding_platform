@@ -69,6 +69,7 @@ smoke deploy is healthy.
 | 2026-04-23 | `terraform apply tfplan` after ALB security group description cleanup | Apply stalled destroying the ALB security group because the group was still attached to the ALB. Security group descriptions are effectively replacement-only here. | Interrupt the apply once, rename the ALB security group resource to `onboarding-platform-alb-public-sg`, use `create_before_destroy`, re-plan, and apply the new plan. |
 | 2026-04-23 | `terraform apply tfplan` after ALB security group rename and 30 GiB root volume fix | Apply succeeded. Terraform reported `7 added, 2 changed, 1 destroyed`. Fleet outputs: `alb_dns_name=onboarding-platform-alb-637111522.us-east-1.elb.amazonaws.com`, VPC `vpc-06329d06f30d45bec`, and all 5 instance ids/private IPs. | Wait for all 5 EC2s to register in SSM, then build and push the server image, render inventory, and run Ansible. |
 | 2026-04-24 | `ansible-playbook playbooks/site.yml ...` from WSL on `/mnt/c/...` | First failure: Ansible ignored `ansible.cfg` because the repo lives on a world-writable Windows mount, so inventory and roles were not loaded. Second failure after forcing `ANSIBLE_CONFIG`: `amazon.aws.aws_ssm` crashed in `Gathering Facts` because the generated inventory did not set `ansible_aws_ssm_bucket_name`. | Treat the S3 transfer bucket as an account prerequisite, make `render-inventory.sh` write `ansible_aws_ssm_bucket_name`, and always export `ANSIBLE_CONFIG="$PWD/ansible.cfg"` when running Ansible from `/mnt/c` in WSL. |
+| 2026-04-24 | `ansible-playbook playbooks/site.yml ...` after SSM bucket fix | `Gathering Facts` still failed on every host because Ansible tried to create `/home/ec2-user/.ansible/tmp`, but the SSM session was running as `ssm-user`. | Set `remote_tmp` under `/tmp` in `infra/ansible/ansible.cfg`, generate inventory with `ansible_user: ssm-user`, rerender inventory, and rerun the playbook. |
 
 Current deploy position:
 
@@ -723,7 +724,9 @@ pair prompt. The `common` role runs first on all hosts, then `db`,
 inaccessible, and writes `ansible_aws_ssm_bucket_name` into
 `infra/ansible/inventory/hosts.yml`. The default bucket name is
 `onboarding-platform-ssm-<account-id>` unless you override it with
-`ANSIBLE_SSM_BUCKET`.
+`ANSIBLE_SSM_BUCKET`. The generated inventory also uses `ansible_user: ssm-user`,
+and `infra/ansible/ansible.cfg` pins `remote_tmp` under `/tmp` so the SSM
+session does not try to write module staging files under `/home/ec2-user`.
 
 Use `https://placeholder.invalid` only for backend smoke deploys before the
 frontend exists on Vercel. Once Vercel gives you a real production URL,

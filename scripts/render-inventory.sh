@@ -79,7 +79,7 @@ all:
     ansible_connection: amazon.aws.aws_ssm
     ansible_aws_ssm_region: ${REGION}
     ansible_aws_ssm_bucket_name: ${SSM_BUCKET}
-    ansible_user: ec2-user
+    ansible_user: ssm-user
     ansible_python_interpreter: /usr/bin/python3
     aws_region: ${REGION}
     ecr_registry: ${ECR_REGISTRY}

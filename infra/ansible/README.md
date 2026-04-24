@@ -51,7 +51,9 @@ for SSM, `private_ip` for Postgres/Redis URLs and Prometheus targets, and
 `onboarding_platform_container_image` set to the most recently pushed ECR tag
 (DATE-SHORTSHA-MSG format, resolved via `aws ecr describe-images`). It also
 writes `ansible_aws_ssm_bucket_name`, which the `amazon.aws.aws_ssm` connection
-plugin requires.
+plugin requires. The generated inventory sets `ansible_user: ssm-user`, because
+the SSM session runs as `ssm-user`; the playbooks then use `become: true` for
+root-level configuration.
 
 Override the tag by setting `DEPLOY_IMAGE_TAG` before running the script.
 
@@ -70,6 +72,10 @@ export ANSIBLE_CONFIG="$PWD/ansible.cfg"   # needed on /mnt/c in WSL
 export AWS_PROFILE=your-profile   # or rely on instance profile on a jump box
 ansible-playbook playbooks/site.yml --vault-password-file ~/.vault/onboarding
 ```
+
+`ansible.cfg` pins `remote_tmp` under `/tmp` so Ansible does not try to create
+its module staging directory under `/home/ec2-user` while the SSM session is
+actually running as `ssm-user`.
 
 ## Role map
 

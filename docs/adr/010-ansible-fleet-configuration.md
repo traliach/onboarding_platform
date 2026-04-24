@@ -20,7 +20,9 @@ generated from Terraform outputs (`instance_ids`, `instance_private_ips`) via
 id (required for SSM), carries `private_ip` for DB URLs, Redis URLs, and
 Prometheus static scrape targets, and includes
 `ansible_aws_ssm_bucket_name` for the S3 transfer bucket that the connection
-plugin uses for module payloads.
+plugin uses for module payloads. Inventory also uses `ansible_user: ssm-user`,
+with `become: true` in the plays, because SSM sessions land as `ssm-user` even
+though the AMI's normal login account is `ec2-user`.
 
 Secrets live in **Ansible Vault** under `group_vars/all/vault.yml`. The
 encrypted file is committed so GitHub Actions has something to decrypt; only
