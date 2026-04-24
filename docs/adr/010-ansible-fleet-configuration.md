@@ -16,9 +16,11 @@ management must work over the same transport.
 ## Decision
 **Use Ansible with the `amazon.aws.aws_ssm` connection plugin.** Inventory is
 generated from Terraform outputs (`instance_ids`, `instance_private_ips`) via
-`infra/ansible/scripts/render-inventory.sh`, which writes `ansible_host` as the
-EC2 instance id (required for SSM) and carries `private_ip` for DB URLs, Redis
-URLs, and Prometheus static scrape targets.
+`scripts/render-inventory.sh`, which writes `ansible_host` as the EC2 instance
+id (required for SSM), carries `private_ip` for DB URLs, Redis URLs, and
+Prometheus static scrape targets, and includes
+`ansible_aws_ssm_bucket_name` for the S3 transfer bucket that the connection
+plugin uses for module payloads.
 
 Secrets live in **Ansible Vault** under `group_vars/all/vault.yml`. The
 encrypted file is committed so GitHub Actions has something to decrypt; only
@@ -47,6 +49,8 @@ vault password lives in the GitHub secret `ANSIBLE_VAULT_PASSWORD`.
 ## Consequences
 - Operators must run `ansible-galaxy collection install -r requirements.yml`
   once per controller.
+- Each AWS account needs one dedicated S3 transfer bucket for
+  `amazon.aws.aws_ssm`; this repo defaults to `onboarding-platform-ssm-<account-id>`.
 - CI deploys require both the committed encrypted `vault.yml` and the
   `ANSIBLE_VAULT_PASSWORD` GitHub secret.
 - Because the fleet has no NAT gateway, roles that install upstream packages

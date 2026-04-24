@@ -1,4 +1,4 @@
-# Frontend CI (CLAUDE.md §8).
+# Frontend CI for the Vercel client path.
 #
 # What this does:
 #   - On every pull request and every push to main that touches client/

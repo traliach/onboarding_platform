@@ -4,6 +4,7 @@
 #
 # Connection: SSM (amazon.aws.aws_ssm). No SSH. Controller needs:
 #   - AWS creds (profile or env) with ssm:StartSession on the fleet
+#   - S3 transfer bucket configured as ansible_aws_ssm_bucket_name in inventory
 #   - ansible-galaxy collection install -r requirements.yml
 #
 # Inventory: run scripts/render-inventory.sh from the repo root after

@@ -1,4 +1,4 @@
-# Infrastructure CI (CLAUDE.md §8 / §11 / ADR-007).
+# Infrastructure CI for the Terraform + Ansible path.
 #
 # What this does:
 #   - On every pull request touching infra/terraform/** (or this file):
@@ -13,8 +13,9 @@
 #     on a lock is a worse signal than queuing).
 #
 # What this does NOT do:
-#   - Does not create the S3 state bucket, DynamoDB lock table, or OIDC
-#     role. Those are pre-existing resources created once via AWS CLI
+#   - Does not create the S3 state bucket, DynamoDB lock table, GitHub OIDC
+#     role, or the Ansible SSM transfer bucket. Those are pre-existing
+#     account resources created once via AWS CLI
 #     (see docs/runbook.md). CI assumes they already exist.
 #   - Does not run `tfsec` / `checkov`. Security scanning is a
 #     separate PR and a separate decision; adding it quietly here
@@ -283,6 +284,7 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: "false"
           ANSIBLE_FORCE_COLOR: "true"
+          ANSIBLE_CONFIG: ${{ github.workspace }}/infra/ansible/ansible.cfg
         run: |
           printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > /tmp/.vault-pass
           chmod 600 /tmp/.vault-pass

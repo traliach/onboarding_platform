@@ -68,6 +68,7 @@ smoke deploy is healthy.
 | 2026-04-23 | `terraform apply tfplan` | Partial apply: VPC, networking, ALB, IAM instance profile, security groups, and VPC endpoints were created. EC2 creation failed because the latest AL2023 root snapshot requires at least 30 GiB, but Terraform forced 20 GiB. | Do not reuse the old plan. Patch `ebs_volume_size` to 30, then rerun `terraform fmt -recursive`, `terraform plan -out=tfplan`, and `terraform apply tfplan`. |
 | 2026-04-23 | `terraform apply tfplan` after ALB security group description cleanup | Apply stalled destroying the ALB security group because the group was still attached to the ALB. Security group descriptions are effectively replacement-only here. | Interrupt the apply once, rename the ALB security group resource to `onboarding-platform-alb-public-sg`, use `create_before_destroy`, re-plan, and apply the new plan. |
 | 2026-04-23 | `terraform apply tfplan` after ALB security group rename and 30 GiB root volume fix | Apply succeeded. Terraform reported `7 added, 2 changed, 1 destroyed`. Fleet outputs: `alb_dns_name=onboarding-platform-alb-637111522.us-east-1.elb.amazonaws.com`, VPC `vpc-06329d06f30d45bec`, and all 5 instance ids/private IPs. | Wait for all 5 EC2s to register in SSM, then build and push the server image, render inventory, and run Ansible. |
+| 2026-04-24 | `ansible-playbook playbooks/site.yml ...` from WSL on `/mnt/c/...` | First failure: Ansible ignored `ansible.cfg` because the repo lives on a world-writable Windows mount, so inventory and roles were not loaded. Second failure after forcing `ANSIBLE_CONFIG`: `amazon.aws.aws_ssm` crashed in `Gathering Facts` because the generated inventory did not set `ansible_aws_ssm_bucket_name`. | Treat the S3 transfer bucket as an account prerequisite, make `render-inventory.sh` write `ansible_aws_ssm_bucket_name`, and always export `ANSIBLE_CONFIG="$PWD/ansible.cfg"` when running Ansible from `/mnt/c` in WSL. |
 
 Current deploy position:
 
@@ -290,6 +291,8 @@ The Terraform root module expects these resources to already exist before
 - S3 state bucket: `achille-tf-state`
 - DynamoDB lock table: `onboarding-platform-tf-lock`
 - GitHub OIDC role: `onboarding-platform-github-actions`
+- Ansible SSM transfer bucket: `onboarding-platform-ssm-<account-id>` by
+  default, or whatever you set in `ANSIBLE_SSM_BUCKET`
 
 They are account-level prerequisites, not resources in this repo. Do not add a
 new Terraform account-setup module for them. The ECR repository is also outside
@@ -308,6 +311,37 @@ OIDC_ROLE_ARN=$(aws iam get-role \
   --query 'Role.Arn' \
   --output text)
 echo "$OIDC_ROLE_ARN"
+
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+ANSIBLE_SSM_BUCKET="${ANSIBLE_SSM_BUCKET:-onboarding-platform-ssm-${ACCOUNT}}"
+aws s3api head-bucket --bucket "$ANSIBLE_SSM_BUCKET"
+```
+
+Do not reuse the Terraform state bucket for Ansible-over-SSM module transfer.
+The `amazon.aws.aws_ssm` connection plugin uploads module payloads there. Keep
+that traffic in a dedicated bucket so state history and transient Ansible
+payloads stay separate.
+
+If the Ansible bucket is missing, create it once:
+
+```bash
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+ANSIBLE_SSM_BUCKET="${ANSIBLE_SSM_BUCKET:-onboarding-platform-ssm-${ACCOUNT}}"
+
+aws s3api head-bucket --bucket "$ANSIBLE_SSM_BUCKET" >/dev/null 2>&1 \
+  || aws s3api create-bucket \
+    --bucket "$ANSIBLE_SSM_BUCKET" \
+    --region "$REGION"
+
+aws s3api put-public-access-block \
+  --bucket "$ANSIBLE_SSM_BUCKET" \
+  --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws s3api put-bucket-encryption \
+  --bucket "$ANSIBLE_SSM_BUCKET" \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 ```
 
 If the DynamoDB lock table is missing, create it once:
@@ -674,7 +708,8 @@ ansible-galaxy collection install -r infra/ansible/requirements.yml
 
 # Run the full fleet
 cd infra/ansible
-FRONTEND_ORIGIN="https://app.example.com"
+export ANSIBLE_CONFIG="$PWD/ansible.cfg"   # needed when repo lives under /mnt/c in WSL
+FRONTEND_ORIGIN="https://placeholder.invalid"
 ansible-playbook playbooks/site.yml \
   --ask-vault-pass \
   -e "onboarding_platform_frontend_origin=${FRONTEND_ORIGIN}"
@@ -683,6 +718,17 @@ ansible-playbook playbooks/site.yml \
 Ansible connects to each EC2 via SSM — no SSH keys, no bastion, no key
 pair prompt. The `common` role runs first on all hosts, then `db`,
 `worker`, `app`, `prometheus`, `grafana` in dependency order.
+
+`render-inventory.sh` now fails early if the SSM transfer bucket is missing or
+inaccessible, and writes `ansible_aws_ssm_bucket_name` into
+`infra/ansible/inventory/hosts.yml`. The default bucket name is
+`onboarding-platform-ssm-<account-id>` unless you override it with
+`ANSIBLE_SSM_BUCKET`.
+
+Use `https://placeholder.invalid` only for backend smoke deploys before the
+frontend exists on Vercel. Once Vercel gives you a real production URL,
+rerun this playbook with that real frontend origin so CORS and portal links
+match the deployed client.
 
 Return to the repo root before Step 9:
 

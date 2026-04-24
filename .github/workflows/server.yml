@@ -1,4 +1,4 @@
-# Backend CI (CLAUDE.md §11).
+# Backend CI for the API, worker, and ECR image path.
 #
 # What this does:
 #   - On every pull request and every push to main that touches server/
@@ -168,7 +168,7 @@ jobs:
 
       - name: Build image tag
         id: tag
-        # DATE-SHORTSHA-MSG format per CLAUDE.md §5.
+        # DATE-SHORTSHA-MSG format from the deploy docs.
         # One traceable tag per push — no mutable :main or :latest alias.
         # render-inventory.sh queries ECR for the most-recent tag at deploy
         # time so infra.yml always gets the latest good build.

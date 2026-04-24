@@ -2,7 +2,8 @@
 # Generates infra/ansible/inventory/hosts.yml from live Terraform outputs.
 # Run from the repo root after `terraform apply` in infra/terraform/.
 #
-# Requires: terraform (initialised backend), jq, aws CLI with active credentials.
+# Requires: terraform (initialised backend), jq, aws CLI with active
+# credentials, and access to the S3 bucket used by amazon.aws.aws_ssm.
 set -euo pipefail
 
 TF_DIR="infra/terraform"
@@ -33,6 +34,21 @@ grafana_ip=$(echo   "$OUTPUTS" | jq -r '.instance_private_ips.value.grafana')
 # local runs both resolve to the correct account without hard-coding.
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+DEFAULT_SSM_BUCKET="$(printf '%s' "${PROJECT}-ssm-${ACCOUNT_ID}" | tr '[:upper:]' '[:lower:]')"
+SSM_BUCKET="${ANSIBLE_SSM_BUCKET:-${DEFAULT_SSM_BUCKET}}"
+
+if ! aws s3api head-bucket --bucket "${SSM_BUCKET}" >/dev/null 2>&1; then
+  cat >&2 <<EOF
+error: Ansible SSM transfer bucket missing or inaccessible: ${SSM_BUCKET}
+
+The amazon.aws.aws_ssm connection plugin stages Ansible modules through S3.
+Create the bucket once for this AWS account, or override the expected name
+with ANSIBLE_SSM_BUCKET before rerunning this script.
+
+See docs/deploy.md for the supported setup.
+EOF
+  exit 1
+fi
 
 # Image tag to deploy. server.yml pushes one traceable tag per merge to main
 # (DATE-SHORTSHA-MSG format; no mutable :main or :latest alias).
@@ -62,6 +78,7 @@ all:
   vars:
     ansible_connection: amazon.aws.aws_ssm
     ansible_aws_ssm_region: ${REGION}
+    ansible_aws_ssm_bucket_name: ${SSM_BUCKET}
     ansible_user: ec2-user
     ansible_python_interpreter: /usr/bin/python3
     aws_region: ${REGION}
@@ -96,4 +113,4 @@ all:
           private_ip: ${grafana_ip}
 EOF
 
-echo "Inventory written to $OUT (image: ${CONTAINER_IMAGE})"
+echo "Inventory written to $OUT (image: ${CONTAINER_IMAGE}, ssm bucket: ${SSM_BUCKET})"

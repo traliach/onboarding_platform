@@ -48,7 +48,7 @@ surface, and the infrastructure story, not the integrations themselves.
 | Frontend | **Complete.** Dashboard (clients + analytics tabs), portal page, login, client detail with live step polling and retry UI. Deployed to Vercel free tier. |
 | Local stack | **Complete.** `docker compose up` starts the full backend in one command. |
 | Terraform | **Complete.** VPC, security groups (per-tier SG segmentation), 5 × t2.micro EC2s, ALB, SSM VPC endpoints, and the EC2 SSM/ECR instance role. S3 remote state, DynamoDB locking, ECR, and the GitHub OIDC role are account prerequisites created outside the app root. |
-| Ansible | **Complete.** Six idempotent roles (common, db, worker, app, prometheus, grafana) run in order by a single master playbook over SSM. |
+| Ansible | **Complete.** Six idempotent roles (common, db, worker, app, prometheus, grafana) run in order by a single master playbook over SSM. A dedicated S3 transfer bucket is an account prerequisite for the `amazon.aws.aws_ssm` connection plugin. |
 | Monitoring | **Complete.** `monitoring/` holds Prometheus scrape config + 4 alert rules + 2 provisioned Grafana dashboards. Ansible deploys from the repo — nothing is hand-configured on the EC2. |
 | CI/CD | **Complete.** Three path-scoped workflows. `server.yml` builds + pushes to ECR on main. `infra.yml` runs `terraform apply` + Ansible + ALB smoke test on merge. |
 | Docs | **Complete.** 10 ADRs, `cost.md`, `architecture.md`, `deploy.md`, `runbook.md`. |

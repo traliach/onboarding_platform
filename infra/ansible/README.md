@@ -8,8 +8,18 @@ Configures the five-EC2 fleet **after** Terraform has created it. Connection is
 - Ansible ≥ 2.15
 - Python 3 + `pip` (for `boto3` if not already installed)
 - AWS credentials with `ssm:StartSession` on the fleet (named profile recommended)
+- One S3 bucket for `amazon.aws.aws_ssm` module transfer (repo default:
+  `onboarding-platform-ssm-<account-id>`)
 - Collections: `ansible-galaxy collection install -r requirements.yml`
 - `jq`, `terraform`, and `aws` CLI for `scripts/render-inventory.sh`
+
+## One-time AWS prerequisite
+
+`amazon.aws.aws_ssm` is not pure shell-over-SSM. The connection plugin uploads
+Ansible modules through S3, then has the EC2 instance fetch them over the SSM
+session. This repo expects a dedicated bucket named
+`onboarding-platform-ssm-<account-id>` unless you override it with
+`ANSIBLE_SSM_BUCKET`.
 
 ## One-time secrets
 
@@ -39,7 +49,9 @@ bash scripts/render-inventory.sh
 This writes `inventory/hosts.yml` (gitignored) with `ansible_host` = instance id
 for SSM, `private_ip` for Postgres/Redis URLs and Prometheus targets, and
 `onboarding_platform_container_image` set to the most recently pushed ECR tag
-(DATE-SHORTSHA-MSG format, resolved via `aws ecr describe-images`).
+(DATE-SHORTSHA-MSG format, resolved via `aws ecr describe-images`). It also
+writes `ansible_aws_ssm_bucket_name`, which the `amazon.aws.aws_ssm` connection
+plugin requires.
 
 Override the tag by setting `DEPLOY_IMAGE_TAG` before running the script.
 
@@ -54,6 +66,7 @@ from repo root (`docker build -f server/Dockerfile .`) before the `app` and
 From `infra/ansible`:
 
 ```bash
+export ANSIBLE_CONFIG="$PWD/ansible.cfg"   # needed on /mnt/c in WSL
 export AWS_PROFILE=your-profile   # or rely on instance profile on a jump box
 ansible-playbook playbooks/site.yml --vault-password-file ~/.vault/onboarding
 ```

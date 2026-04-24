@@ -3,11 +3,16 @@
 #
 # ansible_host MUST be the EC2 instance id for SSM. private_ip is used for
 # wait_for, DATABASE_URL, REDIS_URL, and Prometheus scrape targets.
+# amazon.aws.aws_ssm also stages modules through S3, so this inventory must
+# include a transfer bucket name. The repo default is
+# onboarding-platform-ssm-<account-id>; override with ANSIBLE_SSM_BUCKET if
+# your account uses a different bucket.
 
 all:
   vars:
     ansible_connection: amazon.aws.aws_ssm
     ansible_aws_ssm_region: us-east-1
+    ansible_aws_ssm_bucket_name: onboarding-platform-ssm-123456789012
     ansible_user: ec2-user
     ansible_python_interpreter: /usr/bin/python3
   children:

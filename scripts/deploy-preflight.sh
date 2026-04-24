@@ -8,10 +8,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}" || exit 1
 
 REGION="${AWS_REGION:-${REGION:-us-east-1}}"
+PROJECT_NAME="${PROJECT_NAME:-onboarding-platform}"
 STATE_BUCKET="${TF_STATE_BUCKET:-achille-tf-state}"
 LOCK_TABLE="${TF_LOCK_TABLE:-onboarding-platform-tf-lock}"
 OIDC_ROLE_NAME="${OIDC_ROLE_NAME:-onboarding-platform-github-actions}"
-ECR_REPOSITORY="${ECR_REPOSITORY:-onboarding-platform}"
+ECR_REPOSITORY="${ECR_REPOSITORY:-${PROJECT_NAME}}"
 VAULT_FILE="infra/ansible/group_vars/all/vault.yml"
 
 FAILURES=0
@@ -50,6 +51,8 @@ Phases:
 Important environment variables:
   AWS_REGION or REGION                 AWS region, default us-east-1
   AWS_ACCOUNT_ID                       optional expected AWS account guard
+  ANSIBLE_SSM_BUCKET                   optional S3 bucket for Ansible-over-SSM;
+                                       default <project>-ssm-<account-id>
   FINAL_API_ORIGIN                     production browser API origin, must be https://
   TF_VAR_alb_certificate_arn           production ACM certificate ARN for ALB HTTPS
   ARTIFACT_STRATEGY                    one of controlled-outbound, s3-artifacts, prebaked-ami
@@ -220,6 +223,9 @@ else
       if [[ -n "${AWS_ACCOUNT_ID:-}" && "${ACCOUNT_ID}" != "${AWS_ACCOUNT_ID}" ]]; then
         fail "AWS account mismatch: expected AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}, got ${ACCOUNT_ID}"
       fi
+
+      SSM_BUCKET_DEFAULT="$(printf '%s' "${PROJECT_NAME}-ssm-${ACCOUNT_ID}" | tr '[:upper:]' '[:lower:]')"
+      SSM_BUCKET="${ANSIBLE_SSM_BUCKET:-${SSM_BUCKET_DEFAULT}}"
     else
       fail "AWS credentials are not valid; run aws sso login or set AWS_PROFILE"
     fi
@@ -246,6 +252,14 @@ else
       ok "ECR repository exists: ${ECR_REPOSITORY}"
     else
       fail "ECR repository missing or inaccessible: ${ECR_REPOSITORY}"
+    fi
+
+    if [[ -n "${SSM_BUCKET:-}" ]]; then
+      if aws s3api head-bucket --bucket "${SSM_BUCKET}" >/dev/null 2>&1; then
+        ok "Ansible SSM transfer bucket exists: ${SSM_BUCKET}"
+      else
+        fail "Ansible SSM transfer bucket missing or inaccessible: ${SSM_BUCKET}"
+      fi
     fi
   else
     fail "Skipping AWS checks because aws or jq is missing"
