@@ -47,7 +47,6 @@
         host: "{{ hostvars[groups['db'][0]]['private_ip'] }}"
         port: 5432
         timeout: 300
-      delegate_to: localhost
       become: false
 
     - name: Wait for Redis
@@ -55,7 +54,6 @@
         host: "{{ hostvars[groups['worker'][0]]['private_ip'] }}"
         port: 6379
         timeout: 300
-      delegate_to: localhost
       become: false
 
   roles:

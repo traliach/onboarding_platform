@@ -1,18 +1,52 @@
 ---
-- name: Grafana RPM repository
+- name: Remove Grafana RPM repository
   ansible.builtin.yum_repository:
     name: grafana
-    description: Grafana OSS
-    baseurl: https://rpm.grafana.com
-    gpgcheck: true
-    repo_gpgcheck: true
-    gpgkey: https://rpm.grafana.com/gpg.key
-    sslverify: true
+    state: absent
+
+- name: Ensure controller artifact cache exists
+  ansible.builtin.file:
+    path: "{{ onboarding_platform_artifact_cache_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check cached Grafana RPM
+  ansible.builtin.stat:
+    path: "{{ onboarding_platform_artifact_cache_dir }}/grafana-{{ grafana_version }}-1.x86_64.rpm"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: grafana_rpm_cache
+
+- name: Download Grafana RPM to controller
+  ansible.builtin.get_url:
+    url: "https://dl.grafana.com/oss/release/grafana-{{ grafana_version }}-1.x86_64.rpm"
+    dest: "{{ onboarding_platform_artifact_cache_dir }}/grafana-{{ grafana_version }}-1.x86_64.rpm"
+    mode: "0644"
+    timeout: "{{ onboarding_platform_release_download_timeout }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: grafana_rpm_download
+  when: not grafana_rpm_cache.stat.exists
+  until: grafana_rpm_download is succeeded
+  retries: "{{ onboarding_platform_release_download_retries }}"
+  delay: "{{ onboarding_platform_release_download_delay }}"
+
+- name: Copy Grafana RPM to instance
+  ansible.builtin.copy:
+    src: "{{ onboarding_platform_artifact_cache_dir }}/grafana-{{ grafana_version }}-1.x86_64.rpm"
+    dest: "/tmp/grafana-{{ grafana_version }}-1.x86_64.rpm"
+    mode: "0644"
 
 - name: Install Grafana
   ansible.builtin.dnf:
-    name: grafana
+    name: "/tmp/grafana-{{ grafana_version }}-1.x86_64.rpm"
     state: present
+    disable_gpg_check: true
 
 - name: Grafana sysconfig (admin password + bind all interfaces)
   ansible.builtin.copy:
@@ -38,7 +72,7 @@
 
 - name: Prometheus datasource
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../../monitoring/grafana/datasources.yml"
+    src: "{{ playbook_dir }}/../../../monitoring/grafana/datasources.yml"
     dest: /etc/grafana/provisioning/datasources/prometheus.yml
     owner: grafana
     group: grafana
@@ -66,7 +100,7 @@
 
 - name: Fleet overview dashboard
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../monitoring/grafana/dashboards/fleet-overview.json"
+    src: "{{ playbook_dir }}/../../../monitoring/grafana/dashboards/fleet-overview.json"
     dest: /var/lib/grafana/dashboards/fleet-overview.json
     owner: grafana
     group: grafana
@@ -75,7 +109,7 @@
 
 - name: Onboarding jobs dashboard
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../monitoring/grafana/dashboards/onboarding-jobs.json"
+    src: "{{ playbook_dir }}/../../../monitoring/grafana/dashboards/onboarding-jobs.json"
     dest: /var/lib/grafana/dashboards/onboarding-jobs.json
     owner: grafana
     group: grafana

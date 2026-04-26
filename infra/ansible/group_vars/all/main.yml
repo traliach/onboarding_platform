@@ -18,6 +18,9 @@ node_exporter_version: "1.8.2"
 # Prometheus — pinned binary version
 prometheus_version: "2.53.1"
 
+# Grafana — pinned OSS RPM version
+grafana_version: "11.1.2"
+
 # Release archives are downloaded on the Ansible controller, then copied to the
 # private EC2 fleet over the existing SSM/S3 transport. The instances have no
 # public internet route, so remote get_url tasks cannot fetch GitHub releases.

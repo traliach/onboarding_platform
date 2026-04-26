@@ -78,7 +78,7 @@
 
 - name: Prometheus config
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../../monitoring/prometheus/prometheus.yml"
+    src: "{{ playbook_dir }}/../../../monitoring/prometheus/prometheus.yml"
     dest: /etc/prometheus/prometheus.yml
     owner: prometheus
     group: prometheus
@@ -87,7 +87,7 @@
 
 - name: Alert rules
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../monitoring/prometheus/alerts.yml"
+    src: "{{ playbook_dir }}/../../../monitoring/prometheus/alerts.yml"
     dest: /etc/prometheus/alerts.yml
     owner: prometheus
     group: prometheus
