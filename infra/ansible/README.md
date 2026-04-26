@@ -35,6 +35,11 @@ encrypted file from git plus the `ANSIBLE_VAULT_PASSWORD` secret to run the
 Ansible deploy. Never commit plaintext vault copies; use a gitignored scratch
 name such as `vault.plain.yml` when editing manually.
 
+The repo keeps `playbooks/`, `inventory/`, and `group_vars/` as sibling
+directories. `playbooks/site.yml` therefore loads `../group_vars/all/main.yml`
+and `../group_vars/all/vault.yml` explicitly instead of relying on Ansible's
+automatic `group_vars` discovery.
+
 Use a **URL-safe** database password — it is embedded in `DATABASE_URL` inside
 the generated env files.
 

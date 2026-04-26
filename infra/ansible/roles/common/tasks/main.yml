@@ -37,9 +37,41 @@
         line: /swapfile none swap sw 0 0
         state: present
 
-- name: Download node_exporter archive
+- name: Ensure controller artifact cache exists
+  ansible.builtin.file:
+    path: "{{ onboarding_platform_artifact_cache_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check cached node_exporter archive
+  ansible.builtin.stat:
+    path: "{{ onboarding_platform_artifact_cache_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: node_exporter_archive_cache
+
+- name: Download node_exporter archive to controller
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "{{ onboarding_platform_artifact_cache_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    mode: "0644"
+    timeout: "{{ onboarding_platform_release_download_timeout }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: node_exporter_archive_download
+  when: not node_exporter_archive_cache.stat.exists
+  until: node_exporter_archive_download is succeeded
+  retries: "{{ onboarding_platform_release_download_retries }}"
+  delay: "{{ onboarding_platform_release_download_delay }}"
+
+- name: Copy node_exporter archive to instance
+  ansible.builtin.copy:
+    src: "{{ onboarding_platform_artifact_cache_dir }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
     dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
     mode: "0644"
 

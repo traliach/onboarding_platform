@@ -2,6 +2,7 @@
 - name: Install PostgreSQL 16 server + psycopg2 (Ansible modules)
   ansible.builtin.dnf:
     name:
+      - acl
       - postgresql16-server
       - python3-psycopg2
     state: present

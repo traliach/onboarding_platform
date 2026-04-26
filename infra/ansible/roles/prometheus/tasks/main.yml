@@ -18,9 +18,41 @@
     - /var/lib/prometheus
     - /etc/prometheus
 
-- name: Download Prometheus
+- name: Ensure controller artifact cache exists
+  ansible.builtin.file:
+    path: "{{ onboarding_platform_artifact_cache_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Check cached Prometheus archive
+  ansible.builtin.stat:
+    path: "{{ onboarding_platform_artifact_cache_dir }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: prometheus_archive_cache
+
+- name: Download Prometheus to controller
   ansible.builtin.get_url:
     url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: "{{ onboarding_platform_artifact_cache_dir }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    mode: "0644"
+    timeout: "{{ onboarding_platform_release_download_timeout }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: prometheus_archive_download
+  when: not prometheus_archive_cache.stat.exists
+  until: prometheus_archive_download is succeeded
+  retries: "{{ onboarding_platform_release_download_retries }}"
+  delay: "{{ onboarding_platform_release_download_delay }}"
+
+- name: Copy Prometheus archive to instance
+  ansible.builtin.copy:
+    src: "{{ onboarding_platform_artifact_cache_dir }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
     dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
     mode: "0644"
 

@@ -9,30 +9,38 @@
 #   - ansible-galaxy collection install -r requirements.yml
 #
 # Inventory: run scripts/render-inventory.sh from the repo root after
-# terraform apply. group_vars/all/vault.yml must already be encrypted.
+# terraform apply. The playbook loads ../group_vars/all/main.yml and
+# ../group_vars/all/vault.yml explicitly because the repo keeps playbooks/,
+# inventory/, and group_vars/ as sibling directories.
 
 - name: Common baseline on all EC2s
   hosts: all
   become: true
   gather_facts: true
+  vars_files: &all_group_vars
+    - ../group_vars/all/main.yml
+    - ../group_vars/all/vault.yml
   roles:
     - common
 
 - name: PostgreSQL on db
   hosts: db
   become: true
+  vars_files: *all_group_vars
   roles:
     - db
 
 - name: Redis + BullMQ worker on worker
   hosts: worker
   become: true
+  vars_files: *all_group_vars
   roles:
     - worker
 
 - name: API on app
   hosts: app
   become: true
+  vars_files: *all_group_vars
   pre_tasks:
     - name: Wait for PostgreSQL
       ansible.builtin.wait_for:
@@ -54,11 +62,13 @@
 - name: Prometheus
   hosts: prometheus
   become: true
+  vars_files: *all_group_vars
   roles:
     - prometheus
 
 - name: Grafana
   hosts: grafana
   become: true
+  vars_files: *all_group_vars
   roles:
     - grafana

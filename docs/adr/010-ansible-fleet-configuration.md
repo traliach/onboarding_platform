@@ -27,7 +27,10 @@ though the AMI's normal login account is `ec2-user`.
 Secrets live in **Ansible Vault** under `group_vars/all/vault.yml`. The
 encrypted file is committed so GitHub Actions has something to decrypt; only
 plaintext scratch copies and local vault password files are gitignored. The
-vault password lives in the GitHub secret `ANSIBLE_VAULT_PASSWORD`.
+vault password lives in the GitHub secret `ANSIBLE_VAULT_PASSWORD`. Because the
+repo keeps `playbooks/`, `inventory/`, and `group_vars/` as sibling
+directories, `playbooks/site.yml` loads `../group_vars/all/main.yml` and
+`../group_vars/all/vault.yml` explicitly.
 
 ## Rationale
 - **SSM-native** — matches the security model (no SSH keys, no bastion).

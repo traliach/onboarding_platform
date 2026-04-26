@@ -18,6 +18,14 @@ node_exporter_version: "1.8.2"
 # Prometheus — pinned binary version
 prometheus_version: "2.53.1"
 
+# Release archives are downloaded on the Ansible controller, then copied to the
+# private EC2 fleet over the existing SSM/S3 transport. The instances have no
+# public internet route, so remote get_url tasks cannot fetch GitHub releases.
+onboarding_platform_artifact_cache_dir: "{{ lookup('env', 'ONBOARDING_ARTIFACT_CACHE_DIR') | default('/tmp/onboarding-platform-ansible-cache', true) }}"
+onboarding_platform_release_download_timeout: 120
+onboarding_platform_release_download_retries: 5
+onboarding_platform_release_download_delay: 15
+
 # PostgreSQL tuning — ADR-004 / project rules §6 (1 GiB RAM)
 postgres_shared_buffers: "128MB"
 postgres_work_mem: "4MB"
