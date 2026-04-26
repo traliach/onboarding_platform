@@ -48,6 +48,7 @@
         port: 5432
         timeout: 300
       delegate_to: localhost
+      become: false
 
     - name: Wait for Redis
       ansible.builtin.wait_for:
@@ -55,6 +56,7 @@
         port: 6379
         timeout: 300
       delegate_to: localhost
+      become: false
 
   roles:
     - app
