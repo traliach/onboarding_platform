@@ -69,7 +69,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Matches server/package.json `engines.node` and the Alpine
           # base image in server/Dockerfile (node:22-alpine). Bumping
