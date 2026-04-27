@@ -20,6 +20,12 @@
   vars_files: &all_group_vars
     - ../group_vars/all/main.yml
     - ../group_vars/all/vault.yml
+  pre_tasks:
+    - name: Remove stale Grafana RPM repository
+      ansible.builtin.file:
+        path: /etc/yum.repos.d/grafana.repo
+        state: absent
+      when: "'grafana' in group_names"
   roles:
     - common
 

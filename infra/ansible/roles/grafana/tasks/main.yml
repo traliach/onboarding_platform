@@ -53,6 +53,18 @@
     dest: /etc/sysconfig/grafana-server
     mode: "0600"
     content: |
+      GRAFANA_USER=grafana
+      GRAFANA_GROUP=grafana
+      GRAFANA_HOME=/usr/share/grafana
+      LOG_DIR=/var/log/grafana
+      DATA_DIR=/var/lib/grafana
+      MAX_OPEN_FILES=10000
+      CONF_DIR=/etc/grafana
+      CONF_FILE=/etc/grafana/grafana.ini
+      RESTART_ON_UPGRADE=true
+      PLUGINS_DIR=/var/lib/grafana/plugins
+      PROVISIONING_CFG_DIR=/etc/grafana/provisioning
+      PID_FILE_DIR=/var/run/grafana
       GF_SECURITY_ADMIN_PASSWORD={{ onboarding_platform_grafana_admin_password }}
       GF_SERVER_HTTP_ADDR=0.0.0.0
   no_log: true
@@ -116,8 +128,7 @@
     mode: "0644"
   notify: Restart grafana-server
 
-- name: Enable Grafana
+- name: Start Grafana
   ansible.builtin.systemd:
     name: grafana-server
-    enabled: true
     state: started
