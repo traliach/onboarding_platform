@@ -1123,6 +1123,274 @@ the code under it.
 
 ---
 
+## Chapter 13 — The no-NAT provisioning trap
+
+**Situation:**
+Terraform had finally created the smoke fleet: five private EC2 instances,
+one ALB, SSM-only access, no public IPs, and no NAT gateway by design. The
+next step should have been mechanical: run the Ansible master playbook, let
+`common`, `db`, `worker`, `app`, `prometheus`, and `grafana` converge, then
+curl the ALB health endpoints.
+
+**Task:**
+Get the first real Ansible deployment to converge on the private AWS fleet
+and prove the backend and monitoring stack work end-to-end through the ALB,
+SSM port forwarding, Prometheus targets, and Grafana.
+
+**Action:**
+The first failure looked small:
+
+```
+TASK [common : Download node_exporter archive]
+Request failed: <urlopen error timed out>
+```
+
+That timeout happened on every host. At first it looked like transient GitHub
+slowness or a too-short Ansible `get_url` timeout. But the pattern was too
+clean: app, worker, db, prometheus, and grafana all failed on the same public
+GitHub release URL. The instances were doing exactly what the architecture
+said they would do — living in a private subnet with no route to the public
+internet.
+
+The first wrong assumption was that "SSM works" meant "the host can download
+anything Ansible asks it to download." SSM only solved control-plane access.
+It did not give private EC2s arbitrary egress to GitHub, `rpm.grafana.com`,
+or any other public package host. The fix was to move release downloads to
+the controller, cache them under `/tmp/onboarding-platform-ansible-cache`,
+and copy the artifacts to the instances over the existing Ansible SSM/S3
+transport. `node_exporter`, Prometheus, and Grafana all ended up following
+that pattern.
+
+That exposed the second class of failures: Ansible privilege boundaries over
+SSM are not the same as normal SSH. The database role connected as `ssm-user`,
+became root for the play, then tried to become the unprivileged `postgres`
+user for `community.postgresql`. Ansible failed before it even got to SQL:
+
+```
+Failed to set permissions on the temporary files Ansible needs to create
+when becoming an unprivileged user
+```
+
+The minimal fix was not to rewrite the DB tasks. It was to install `acl` on
+the DB host so Ansible could safely make its temporary module files readable
+to the `postgres` user. One package, one line in the DB role.
+
+Then the app play failed while waiting for Postgres:
+
+```
+Timeout when waiting for 10.0.11.153:5432
+```
+
+That was another topology bug. The wait task was delegated to `localhost`,
+so my WSL shell was trying to connect directly to a private VPC IP. The
+database was healthy; the test was being run from the wrong network. A small
+diagnostic play proved the real path:
+
+```
+app EC2 -> db EC2:     5432 reachable
+app EC2 -> worker EC2: 6379 reachable
+SSM -> all five EC2s:  ok
+```
+
+So the wait checks moved back onto the app EC2. The controller should manage
+the fleet, not pretend it is inside the VPC.
+
+Prometheus then failed on a different bad assumption:
+
+```
+Could not find or access
+infra/ansible/playbooks/../../monitoring/prometheus/prometheus.yml
+```
+
+The files existed, but the relative path was wrong. `playbook_dir` was
+`infra/ansible/playbooks`, and `monitoring/` lived at the repo root, not under
+`infra/`. The path needed one more `..`. The same mistake existed in the
+Grafana role, so both roles were patched before rerunning.
+
+Grafana produced the messiest sequence because it combined old state from a
+failed run with the no-NAT design. The first version of the role created a
+YUM repo pointing at `https://rpm.grafana.com`. On the next limited rerun,
+Ansible still executed the `common` play first, and `common`'s first `dnf`
+task hung before the Grafana role got a chance to remove that stale repo.
+The host had a repo file it could not reach. The fix was to remove
+`/etc/yum.repos.d/grafana.repo` before `common` runs on Grafana hosts, then
+install Grafana from a controller-staged OSS RPM instead of a remote repo.
+
+Grafana installed, but still would not start:
+
+```
+Failed to execute /usr/lib/systemd/systemd-sysv-install: No such file or directory
+Job for grafana-server.service failed because the control process exited
+```
+
+The first part was AL2023/systemd compatibility noise around enabling the
+service. Removing `enabled: true` got past that but did not fix startup. The
+real startup bug was self-inflicted: the role had overwritten
+`/etc/sysconfig/grafana-server` with only two `GF_*` variables:
+
+```
+GF_SECURITY_ADMIN_PASSWORD=...
+GF_SERVER_HTTP_ADDR=0.0.0.0
+```
+
+That erased the package defaults Grafana's service script expected:
+`GRAFANA_HOME`, `CONF_FILE`, `DATA_DIR`, `LOG_DIR`, `PLUGINS_DIR`,
+`PID_FILE_DIR`, and the provisioning path. Restoring the package-required
+defaults plus the two intended overrides made Grafana start cleanly.
+
+The final blocker was the ALB returning 502:
+
+```
+HTTP/1.1 502 Bad Gateway
+```
+
+At that point Ansible was clean, so the right question was no longer "what
+role failed?" It was "what does the app target do locally?" ALB target health
+said the app instance was unhealthy. SSM diagnostics on the app host showed
+nothing listening on port 3000 and `onboarding-api.service` crash-looping.
+The container was started with `--rm`, so Docker logs disappeared after each
+exit; the useful evidence lived in `journalctl -u onboarding-api`:
+
+```
+migration runner failed: Invalid URL
+```
+
+That sent me down one wrong turn. I inspected the rendered `DATABASE_URL`,
+redacted the secret, and noticed that Jinja's `urlencode` does not encode `/`
+inside a string:
+
+```
+a/b => a/b
+```
+
+That is safe for a URL path but not safe in the `user:password@host` section,
+so I hardened the API and worker env templates with:
+
+```jinja2
+{{ onboarding_platform_db_password | urlencode | replace('/', '%2F') }}
+```
+
+It was a valid defensive fix, but it was not the blocker that kept the ALB
+red. A fresh diagnostic after the rerun showed the container was now reaching
+Postgres and applying migrations. The new failure was the real one:
+
+```
+migration runner failed: extension "pgcrypto" is not available
+```
+
+The first migration creates `pgcrypto` because the schema uses
+`gen_random_uuid()` for users, clients, jobs, human tasks, audit rows, and
+invite tokens. PostgreSQL 16 server was installed, but the extension files
+were not. The minimal fix was adding `postgresql16-contrib` to the DB role.
+
+After that, the smoke checks finally told a coherent story:
+
+```
+GET /health       -> 200 {"status":"ok","target":"api"}
+GET /health/ready -> 200 {"status":"ready","target":"api"}
+```
+
+Prometheus showed the API target up and all five node_exporter targets up:
+
+```
+api  (1/1 up)
+node (5/5 up)
+```
+
+Grafana opened through SSM port-forwarding and loaded the provisioned UI.
+The final full Ansible run converged with `failed=0`, `unreachable=0`, and
+`changed=0`.
+
+**What I considered but rejected:**
+- **Add a NAT gateway.** It would have made GitHub, Grafana RPMs, and random
+  package repos reachable, but it would also erase the cost and security
+  point of ADR-001. The fleet was intentionally private; the automation had
+  to respect that boundary.
+- **Temporarily open outbound internet and close it later.** Easier for the
+  smoke deploy, worse as an operating model. Every future fresh host would
+  depend on a temporary exception that is easy to forget, hard to audit, and
+  invisible from the Ansible role itself.
+- **SSH into hosts and fix them manually.** That would have solved symptoms
+  faster but destroyed the proof that the fleet is reproducible from code.
+  The whole point of the smoke deploy was to make the next deploy boring.
+- **Skip migrations or remove `pgcrypto`.** The schema deliberately uses
+  server-side UUID generation for security-sensitive tokens. Removing the
+  extension would push token generation back into application code and weaken
+  the model just to avoid installing the right database package.
+- **Ignore the worker env template because only the API was failing.** The
+  worker uses the same `DATABASE_URL` shape. Leaving it unfixed would keep a
+  latent production bug in the next process that touched Postgres with a
+  password containing a reserved URL character.
+
+**What actually fixed it:**
+The final fix was not one patch; it was aligning the playbook with the actual
+network and runtime model:
+
+- Controller-stage public artifacts, then copy them to private EC2s over
+  Ansible's SSM/S3 transport.
+- Install `acl` so Ansible can safely become the `postgres` user over SSM.
+- Run private service readiness checks from the app EC2, not from localhost.
+- Correct monitoring file paths from `infra/ansible/playbooks` back to the
+  repo-root `monitoring/` directory.
+- Remove stale Grafana YUM repo state before any `dnf` task can use it.
+- Install Grafana from a staged RPM and preserve the package's sysconfig
+  defaults.
+- Install `postgresql16-contrib` so `CREATE EXTENSION pgcrypto` succeeds.
+- Harden `DATABASE_URL` rendering for reserved characters in credentials.
+
+The validation was deliberately end-to-end: a clean Ansible run, ALB health
+and readiness through the public listener, Prometheus target state through
+SSM port-forwarding, and Grafana loading through its own SSM tunnel.
+
+**Why that choice over the alternatives:**
+The important choice was to treat the architecture as fixed and the automation
+as wrong, not the other way around. The no-NAT design was not the bug. The bug
+was writing roles that assumed public egress, local access to private IPs,
+and package-manager state that could reach internet repositories.
+
+Keeping the fixes inside Ansible also preserved the deployment contract: a
+new instance should converge because the role describes what it needs, not
+because I remember a sequence of manual repairs from the smoke environment.
+That is why even tiny issues — the stale Grafana repo, the `acl` package, the
+one extra `..` in a monitoring path — were patched into code instead of left
+as notes.
+
+The one place I accepted a broader patch than the immediate symptom was the
+`DATABASE_URL` encoding. It did not turn out to be the final ALB blocker, but
+it was still a real bug class in the template. A database password containing
+`/` should not be able to break a deploy. Fixing both API and worker templates
+while that edge case was visible was cheaper than rediscovering it later with
+a different secret.
+
+**What I learned:**
+SSM is not NAT. It gives you a control channel, not a general-purpose egress
+path. In a private fleet, every public dependency has to be classified up
+front: AWS service endpoint, controller-staged artifact, S3-staged artifact,
+or baked into the image. "The host will download it during provisioning" is
+not a neutral implementation detail; it is an architectural claim.
+
+The second lesson is that an idempotent playbook can still encode wrong
+assumptions. `changed=0` only means Ansible believes the declared state is
+present. It does not mean the app is listening, the ALB target is healthy,
+or migrations can run. The real smoke path is layered: Ansible convergence,
+local service status, ALB target health, public `/health`, public
+`/health/ready`, Prometheus targets, Grafana UI.
+
+The third lesson is to diagnose from the closest failing boundary. A 502 is
+not an ALB problem until the app is known to answer locally. A private-IP
+timeout is not a security-group problem until the test is run from inside the
+VPC. A missing Grafana UI is not a dashboard problem until the service starts.
+Each time the debugging got unstuck, it was because the test moved one layer
+closer to the thing that was actually failing.
+
+Most of all: the first real deploy is where architecture stops being a diagram.
+Every arrow in the diagram becomes a command, a route table, a package source,
+a systemd unit, or a health check. The value of the smoke deploy was not that
+it passed on the first try. It did not. The value was that every failure turned
+into code, and the final rerun was boring.
+
+---
+
 ## Summary of key engineering decisions
 
 | Decision | Alternative considered | Why this choice |
