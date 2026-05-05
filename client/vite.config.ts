@@ -1,10 +1,9 @@
 /**
  * Vite config — React + TypeScript SPA.
  *
- * API calls go directly to `VITE_API_BASE_URL` (cross-origin), not through
- * a dev proxy. The server's CORS_ALLOWED_ORIGINS already lists
- * http://localhost:5173, so this matches production (Vercel → ALB) and
- * exercises the real cookie semantics in development.
+ * API calls go to `VITE_API_BASE_URL`. Local development uses
+ * http://localhost:4000; the free Vercel deployment uses `/api`, which is
+ * rewritten to the ALB by client/vercel.json.
  */
 
 /// <reference types="vitest" />

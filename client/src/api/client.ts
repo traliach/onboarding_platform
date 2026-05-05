@@ -8,8 +8,9 @@
  *     on cross-origin requests. project rules section 10.
  *   - Every response status is mapped to a typed error (errors.ts). UI
  *     code never parses response.status on its own.
- *   - The base URL comes from VITE_API_BASE_URL at build time. Never read
- *     `window.location` or hardcode; that breaks the Vercel → ALB story.
+ *   - The base URL comes from VITE_API_BASE_URL at build time. For the
+ *     free Vercel deploy, set it to `/api`; Vercel rewrites that path to
+ *     the ALB while the browser still sees same-origin HTTPS.
  *
  * Adding a new endpoint means one function here with a well-typed signature.
  * Never let call sites hand-roll fetch — the CORS + cookie + error-mapping
@@ -44,8 +45,8 @@ import {
 /**
  * Resolve the API base URL with a sensible dev fallback.
  *
- * Production (Vercel): VITE_API_BASE_URL is set to the ALB origin at build
- * time; the value is baked into the bundle.
+ * Production (Vercel): VITE_API_BASE_URL is set to /api so requests stay
+ * same-origin in the browser and are proxied to the ALB by client/vercel.json.
  * Development: if the env var is unset, fall back to http://localhost:4000
  * so `npm run dev` works without a copied .env.development file. We never
  * fall back in a production build — an unset var there is a deploy bug
